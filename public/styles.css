@@ -879,7 +879,7 @@ button {
   grid-auto-rows: 40px;
   gap: 8px;
   min-height: 88px;
-  max-height: 88px;
+  max-height: 220px;
   overflow: auto;
 }
 
