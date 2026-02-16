@@ -98,7 +98,7 @@ function Ensure-Service {
   if (-not $existing) {
     New-Service -Name $Name -BinaryPathName $BinaryPath -DisplayName $DisplayName -StartupType Automatic | Out-Null
   } else {
-    $configOut = & sc.exe config $Name "binPath= $BinaryPath" "start= auto" "DisplayName= $DisplayName"
+    $configOut = & sc.exe config $Name "binPath=" "$BinaryPath" "start=" "auto" "DisplayName=" "$DisplayName"
     if ($LASTEXITCODE -ne 0) {
       throw "Failed to update service '$Name' via sc.exe config.`n$configOut"
     }
@@ -109,7 +109,7 @@ function Ensure-Service {
     throw "Failed to set description for service '$Name'.`n$descriptionOut"
   }
 
-  $failureOut = & sc.exe failure $Name "reset= 86400" "actions= restart/5000/restart/5000/restart/5000"
+  $failureOut = & sc.exe failure $Name "reset=" "86400" "actions=" "restart/5000/restart/5000/restart/5000"
   if ($LASTEXITCODE -ne 0) {
     throw "Failed to set recovery policy for service '$Name'.`n$failureOut"
   }
