@@ -148,6 +148,21 @@ function Wait-ForHealth {
   return $false
 }
 
+function Stop-ManualProcesses {
+  param(
+    [string]$TargetDirValue,
+    [string]$CaddyConfigPathValue
+  )
+
+  Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -eq "node.exe" -and $_.CommandLine -like "*$TargetDirValue\src\server.js*" } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+
+  Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -eq "caddy_windows_amd64.exe" -and $_.CommandLine -like "*$CaddyConfigPathValue*" } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+}
+
 if (-not $SkipServices) {
   Assert-Admin
 }
@@ -236,6 +251,21 @@ if ([string]::IsNullOrWhiteSpace($adminIds)) {
   Write-Warning "ADMIN_IDS is empty in .env. Add Telegram user IDs for admin access."
 }
 
+Write-Step "Stopping old app processes before npm install"
+if (-not $SkipServices) {
+  $appService = Get-Service -Name $AppServiceName -ErrorAction SilentlyContinue
+  if ($appService -and $appService.Status -eq "Running") {
+    Stop-Service -Name $AppServiceName -Force -ErrorAction SilentlyContinue
+  }
+
+  $caddyService = Get-Service -Name $CaddyServiceName -ErrorAction SilentlyContinue
+  if ($caddyService -and $caddyService.Status -eq "Running") {
+    Stop-Service -Name $CaddyServiceName -Force -ErrorAction SilentlyContinue
+  }
+}
+Stop-ManualProcesses -TargetDirValue $TargetDir -CaddyConfigPathValue $CaddyConfigPath
+Start-Sleep -Seconds 1
+
 Write-Step "Installing npm dependencies in $TargetDir"
 Push-Location $TargetDir
 try {
@@ -306,15 +336,7 @@ if (-not $SkipServices) {
   Restart-ServiceSafe -Name $CaddyServiceName
 } else {
   Write-Step "Starting app and caddy in manual mode (no Windows services)"
-
-  Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -eq "node.exe" -and $_.CommandLine -like "*$TargetDir\src\server.js*" } |
-    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
-
-  Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -eq "caddy_windows_amd64.exe" -and $_.CommandLine -like "*$CaddyConfigPath*" } |
-    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
-
+  Stop-ManualProcesses -TargetDirValue $TargetDir -CaddyConfigPathValue $CaddyConfigPath
   Start-Process -FilePath $env:ComSpec -ArgumentList "/c `"$runCmdPath`"" -WindowStyle Hidden
   Start-Process -FilePath $env:ComSpec -ArgumentList "/c `"$runCaddyCmdPath`"" -WindowStyle Hidden
 }
