@@ -126,7 +126,7 @@ function createPublicRouter(db) {
       slotStartLocalIso: z.string().min(1),
       name: z.string().trim().min(2).max(80),
       phone: z.string().trim().min(6).max(32),
-      carPlate: z.string().trim().min(6).max(16),
+      carPlate: z.string().trim().min(6).max(10),
     });
 
     const parsed = schema.safeParse(req.body);
@@ -135,7 +135,7 @@ function createPublicRouter(db) {
     }
 
     if (!isValidRuCarPlate(parsed.data.carPlate)) {
-      return res.status(400).json({ error: "Госномер должен быть в формате А123ВС 77" });
+      return res.status(400).json({ error: "Введите корректный госномер" });
     }
     const carPlate = normalizeRuCarPlate(parsed.data.carPlate);
 

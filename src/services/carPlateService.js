@@ -1,5 +1,6 @@
 const ALLOWED_LETTERS = "АВЕКМНОРСТУХ";
-const PLATE_REGEX = /^[АВЕКМНОРСТУХ]\d{3}[АВЕКМНОРСТУХ]{2}\d{2,3}$/;
+const PLATE_REGEX = /^[АВЕКМНОРСТУХ]\d{3}[АВЕКМНОРСТУХ]{2}$/;
+const LEGACY_WITH_REGION_REGEX = /^[АВЕКМНОРСТУХ]\d{3}[АВЕКМНОРСТУХ]{2}\d{2,3}$/;
 
 const LATIN_TO_CYRILLIC = {
   A: "А",
@@ -40,6 +41,10 @@ function normalizeRuCarPlate(raw) {
     normalized += mapped;
   }
 
+  if (LEGACY_WITH_REGION_REGEX.test(normalized)) {
+    return normalized.slice(0, 6);
+  }
+
   return normalized;
 }
 
@@ -53,8 +58,7 @@ function formatRuCarPlate(raw) {
   if (!normalized || !PLATE_REGEX.test(normalized)) {
     return null;
   }
-
-  return `${normalized.slice(0, 6)} ${normalized.slice(6)}`;
+  return normalized;
 }
 
 module.exports = {
@@ -62,4 +66,3 @@ module.exports = {
   isValidRuCarPlate,
   formatRuCarPlate,
 };
-

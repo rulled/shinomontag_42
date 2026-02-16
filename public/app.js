@@ -328,57 +328,66 @@
     Y: "У",
   };
 
+  const carPlatePattern = ["L", "D", "D", "D", "L", "L"];
+  const carPlateRegex = /^[АВЕКМНОРСТУХ]\d{3}[АВЕКМНОРСТУХ]{2}$/;
+
+  function toCarPlateChar(rawChar) {
+    const upper = String(rawChar || "").toUpperCase();
+    if (/\d/.test(upper)) {
+      return { kind: "D", value: upper };
+    }
+
+    const mapped = latinToCyrillicPlate[upper] || upper;
+    if (!allowedPlateLetters.includes(mapped)) {
+      return null;
+    }
+
+    return { kind: "L", value: mapped };
+  }
+
   function normalizeRuCarPlate(raw) {
     const value = String(raw || "")
       .trim()
-      .toUpperCase()
       .replace(/\s+/g, "")
       .replace(/-/g, "");
 
     if (!value) return "";
 
-    let normalized = "";
+    const mappedChars = [];
     for (const char of value) {
-      if (/\d/.test(char)) {
-        normalized += char;
-        continue;
+      const token = toCarPlateChar(char);
+      if (token) {
+        mappedChars.push(token);
+      }
+    }
+
+    let normalized = "";
+    for (const token of mappedChars) {
+      if (normalized.length >= carPlatePattern.length) {
+        break;
       }
 
-      const mapped = latinToCyrillicPlate[char] || char;
-      if (!allowedPlateLetters.includes(mapped)) {
-        return null;
+      const expected = carPlatePattern[normalized.length];
+      if (token.kind === expected) {
+        normalized += token.value;
       }
-      normalized += mapped;
     }
 
     return normalized;
   }
 
   function formatRuCarPlate(raw) {
-    const normalized = normalizeRuCarPlate(raw);
-    if (!normalized) return "";
-
-    const l1 = normalized.slice(0, 1);
-    const d = normalized.slice(1, 4).replace(/\D/g, "");
-    const l2 = normalized.slice(4, 6).replace(/[^АВЕКМНОРСТУХ]/g, "");
-    const region = normalized.slice(6, 9).replace(/\D/g, "");
-
-    let out = "";
-    if (l1) out += l1;
-    if (d) out += d;
-    if (l2) out += l2;
-    if (region) out += ` ${region}`;
-    return out.trim();
+    return normalizeRuCarPlate(raw);
   }
 
   function isValidRuCarPlate(raw) {
     const normalized = normalizeRuCarPlate(raw);
-    return Boolean(normalized && /^[АВЕКМНОРСТУХ]\d{3}[АВЕКМНОРСТУХ]{2}\d{2,3}$/.test(normalized));
+    return Boolean(normalized && carPlateRegex.test(normalized));
   }
 
   function formatRuCarPlateForApi(raw) {
     const normalized = normalizeRuCarPlate(raw);
-    if (!normalized || !isValidRuCarPlate(normalized)) return null;
+    if (!normalized || !carPlateRegex.test(normalized)) return null;
     return normalized;
   }
 
@@ -397,11 +406,7 @@
 
   function handleCarPlateInput() {
     const formatted = formatRuCarPlate(els.inputCarPlate.value);
-    if (formatted !== "") {
-      els.inputCarPlate.value = formatted;
-    } else if (!els.inputCarPlate.value.trim()) {
-      els.inputCarPlate.value = "";
-    }
+    els.inputCarPlate.value = formatted;
     updateUserActionButton();
   }
 
@@ -599,7 +604,7 @@
 
     if (!isValidRuCarPlate(carPlate)) {
       els.userActionBtn.disabled = true;
-      els.userActionText.textContent = "Введите госномер в формате А123ВС 77";
+      els.userActionText.textContent = "Введите госномер";
       return;
     }
 
@@ -718,7 +723,7 @@
     }
 
     if (!carPlate) {
-      showToast("Госномер должен быть в формате А123ВС 77", "error");
+      showToast("Введите госномер", "error");
       return;
     }
 

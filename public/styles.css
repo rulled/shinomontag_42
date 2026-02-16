@@ -271,6 +271,19 @@ button {
   color: var(--text-tertiary);
 }
 
+.car-plate-field {
+  text-transform: uppercase;
+  text-align: center;
+  letter-spacing: 0.18em;
+  font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+  font-weight: 600;
+  font-size: 22px;
+  border: 1px solid var(--bg-button-active);
+  border-radius: 12px;
+  background: var(--bg-input);
+  padding: 10px 12px;
+}
+
 .btn-main {
   position: fixed;
   bottom: 24px;
