@@ -45,6 +45,7 @@ function initDb(db) {
       user_id INTEGER NOT NULL,
       user_name TEXT NOT NULL,
       phone TEXT NOT NULL,
+      car_plate TEXT NOT NULL,
       slot_start_utc TEXT NOT NULL,
       status TEXT NOT NULL CHECK(status IN ('active', 'canceled', 'completed')),
       cancel_reason TEXT,
@@ -73,6 +74,12 @@ function initDb(db) {
       FOREIGN KEY(booking_id) REFERENCES bookings(id) ON DELETE CASCADE
     );
   `);
+
+  const bookingColumns = db.prepare("PRAGMA table_info(bookings)").all();
+  const hasCarPlate = bookingColumns.some((column) => column.name === "car_plate");
+  if (!hasCarPlate) {
+    db.exec("ALTER TABLE bookings ADD COLUMN car_plate TEXT NOT NULL DEFAULT '';");
+  }
 
   const defaultSettings = [
     ["timezone", "Asia/Krasnoyarsk"],

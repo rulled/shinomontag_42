@@ -1,5 +1,6 @@
 const { DateTime } = require("luxon");
 const { config } = require("../config");
+const { formatRuCarPlate } = require("./carPlateService");
 
 let bot = null;
 
@@ -65,15 +66,17 @@ function buildUserLink(userId, userName) {
 function formatAdminClientBlock(booking) {
   const userLink = buildUserLink(booking.userId, booking.userName);
   const phone = escapeHtml(booking.phone || "");
-  return `Клиент: ${userLink}\nТелефон: ${phone}`;
+  const carPlate = escapeHtml(formatRuCarPlate(booking.carPlate) || booking.carPlate || "—");
+  return `Клиент: ${userLink}\nТелефон: ${phone}\nГосномер: ${carPlate}`;
 }
 
 async function notifyBookingCreated({ booking, timezone }) {
   const slotText = formatSlot(booking.slotStartUtc, timezone);
+  const carPlate = formatRuCarPlate(booking.carPlate) || booking.carPlate || "—";
 
   await sendToUser(
     booking.userId,
-    `Запись создана.\nДата и время: ${slotText}\nИмя: ${booking.userName}\nТелефон: ${booking.phone}`
+    `Запись создана.\nДата и время: ${slotText}\nИмя: ${booking.userName}\nТелефон: ${booking.phone}\nГосномер: ${carPlate}`
   );
 
   await sendToAdmins(

@@ -18,6 +18,7 @@ const {
   notifyBookingRescheduled,
 } = require("../services/notifyService");
 const { getLiveRevision, bumpLiveRevision } = require("../services/liveUpdates");
+const { normalizeRuCarPlate, isValidRuCarPlate } = require("../services/carPlateService");
 
 function createPublicRouter(db) {
   const router = express.Router();
@@ -125,12 +126,18 @@ function createPublicRouter(db) {
       slotStartLocalIso: z.string().min(1),
       name: z.string().trim().min(2).max(80),
       phone: z.string().trim().min(6).max(32),
+      carPlate: z.string().trim().min(6).max(16),
     });
 
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: "Проверьте поля записи" });
     }
+
+    if (!isValidRuCarPlate(parsed.data.carPlate)) {
+      return res.status(400).json({ error: "Госномер должен быть в формате А123ВС 77" });
+    }
+    const carPlate = normalizeRuCarPlate(parsed.data.carPlate);
 
     const check = checkSlotBookable(db, req.user.userId, parsed.data.slotStartLocalIso);
     if (!check.ok) {
@@ -145,17 +152,19 @@ function createPublicRouter(db) {
           user_id,
           user_name,
           phone,
+          car_plate,
           slot_start_utc,
           status,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, 'active', ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, 'active', ?, ?)`
       );
 
       const result = insert.run(
         req.user.userId,
         parsed.data.name,
         parsed.data.phone,
+        carPlate,
         check.slotUtcIso,
         nowUtc,
         nowUtc
@@ -168,6 +177,7 @@ function createPublicRouter(db) {
              user_id AS userId,
              user_name AS userName,
              phone,
+             car_plate AS carPlate,
              slot_start_utc AS slotStartUtc,
              status,
              created_at AS createdAt,
@@ -202,6 +212,7 @@ function createPublicRouter(db) {
            user_id AS userId,
            user_name AS userName,
            phone,
+           car_plate AS carPlate,
            slot_start_utc AS slotStartUtc,
            status,
            created_at AS createdAt
@@ -254,6 +265,7 @@ function createPublicRouter(db) {
            user_id AS userId,
            user_name AS userName,
            phone,
+           car_plate AS carPlate,
            slot_start_utc AS slotStartUtc,
            status,
            created_at AS createdAt,

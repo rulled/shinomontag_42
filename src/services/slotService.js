@@ -88,7 +88,7 @@ function getDaySlotsDetailed(db, date) {
 
   const bookings = db
     .prepare(
-      `SELECT id, user_id AS userId, user_name AS userName, phone, slot_start_utc AS slotStartUtc
+      `SELECT id, user_id AS userId, user_name AS userName, phone, car_plate AS carPlate, slot_start_utc AS slotStartUtc
        FROM bookings
        WHERE status = 'active' AND slot_start_utc >= ? AND slot_start_utc < ?`
     )
@@ -309,6 +309,7 @@ function formatBooking(booking, timezone) {
     userId: booking.userId,
     userName: booking.userName,
     phone: booking.phone,
+    carPlate: booking.carPlate || "",
     status: booking.status,
     slotStartUtc: booking.slotStartUtc,
     slotStartLocalIso: local.toISO({ suppressMilliseconds: true, includeOffset: false }),
@@ -327,6 +328,7 @@ function getUpcomingBookingByUser(db, userId) {
          user_id AS userId,
          user_name AS userName,
          phone,
+         car_plate AS carPlate,
          slot_start_utc AS slotStartUtc,
          status,
          created_at AS createdAt,

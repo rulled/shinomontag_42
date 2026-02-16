@@ -108,6 +108,7 @@
     selectedSlotDisplay: document.getElementById("selected_slot_display"),
     inputName: document.getElementById("input_name"),
     inputPhone: document.getElementById("input_phone"),
+    inputCarPlate: document.getElementById("input_car_plate"),
 
     userActionBtn: document.getElementById("user_action_btn"),
     userActionText: document.getElementById("user_action_text"),
@@ -311,10 +312,95 @@
     return formatRuPhone(raw);
   }
 
+  const allowedPlateLetters = "АВЕКМНОРСТУХ";
+  const latinToCyrillicPlate = {
+    A: "А",
+    B: "В",
+    C: "С",
+    E: "Е",
+    H: "Н",
+    K: "К",
+    M: "М",
+    O: "О",
+    P: "Р",
+    T: "Т",
+    X: "Х",
+    Y: "У",
+  };
+
+  function normalizeRuCarPlate(raw) {
+    const value = String(raw || "")
+      .trim()
+      .toUpperCase()
+      .replace(/\s+/g, "")
+      .replace(/-/g, "");
+
+    if (!value) return "";
+
+    let normalized = "";
+    for (const char of value) {
+      if (/\d/.test(char)) {
+        normalized += char;
+        continue;
+      }
+
+      const mapped = latinToCyrillicPlate[char] || char;
+      if (!allowedPlateLetters.includes(mapped)) {
+        return null;
+      }
+      normalized += mapped;
+    }
+
+    return normalized;
+  }
+
+  function formatRuCarPlate(raw) {
+    const normalized = normalizeRuCarPlate(raw);
+    if (!normalized) return "";
+
+    const l1 = normalized.slice(0, 1);
+    const d = normalized.slice(1, 4).replace(/\D/g, "");
+    const l2 = normalized.slice(4, 6).replace(/[^АВЕКМНОРСТУХ]/g, "");
+    const region = normalized.slice(6, 9).replace(/\D/g, "");
+
+    let out = "";
+    if (l1) out += l1;
+    if (d) out += d;
+    if (l2) out += l2;
+    if (region) out += ` ${region}`;
+    return out.trim();
+  }
+
+  function isValidRuCarPlate(raw) {
+    const normalized = normalizeRuCarPlate(raw);
+    return Boolean(normalized && /^[АВЕКМНОРСТУХ]\d{3}[АВЕКМНОРСТУХ]{2}\d{2,3}$/.test(normalized));
+  }
+
+  function formatRuCarPlateForApi(raw) {
+    const normalized = normalizeRuCarPlate(raw);
+    if (!normalized || !isValidRuCarPlate(normalized)) return null;
+    return normalized;
+  }
+
+  function displayCarPlate(raw) {
+    const formatted = formatRuCarPlate(raw);
+    return formatted || (raw || "—");
+  }
+
   function handlePhoneInput() {
     const formatted = formatRuPhone(els.inputPhone.value);
     if (els.inputPhone.value !== formatted) {
       els.inputPhone.value = formatted;
+    }
+    updateUserActionButton();
+  }
+
+  function handleCarPlateInput() {
+    const formatted = formatRuCarPlate(els.inputCarPlate.value);
+    if (formatted !== "") {
+      els.inputCarPlate.value = formatted;
+    } else if (!els.inputCarPlate.value.trim()) {
+      els.inputCarPlate.value = "";
     }
     updateUserActionButton();
   }
@@ -474,7 +560,7 @@
     els.activeBookingState.hidden = false;
     els.activeStatusText.textContent = booking.isRescheduled ? "ПЕРЕНЕСЕНО" : "ПОДТВЕРЖДЕНО";
     els.activeTime.textContent = booking.slotStartLabel;
-    els.activeDetails.textContent = `${booking.userName} • ${booking.phone}`;
+    els.activeDetails.textContent = `${booking.userName} • ${booking.phone} • ${displayCarPlate(booking.carPlate)}`;
     els.bookingFlow.classList.add("hidden");
     els.formSection.hidden = true;
     els.userActionBtn.classList.add("hidden");
@@ -491,6 +577,7 @@
     const selected = state.userView.selectedSlot;
     const name = els.inputName.value.trim();
     const phone = els.inputPhone.value.trim();
+    const carPlate = els.inputCarPlate.value.trim();
 
     if (!selected) {
       els.userActionBtn.disabled = true;
@@ -498,15 +585,21 @@
       return;
     }
 
-    if (!name || !phone) {
+    if (!name || !phone || !carPlate) {
       els.userActionBtn.disabled = true;
-      els.userActionText.textContent = `Введите имя и телефон (${selected.localLabel})`;
+      els.userActionText.textContent = `Введите имя, телефон и госномер (${selected.localLabel})`;
       return;
     }
 
     if (!isValidRuPhone(phone)) {
       els.userActionBtn.disabled = true;
       els.userActionText.textContent = "Введите телефон в формате +7 (900) 000-00-00";
+      return;
+    }
+
+    if (!isValidRuCarPlate(carPlate)) {
+      els.userActionBtn.disabled = true;
+      els.userActionText.textContent = "Введите госномер в формате А123ВС 77";
       return;
     }
 
@@ -611,14 +704,21 @@
     const name = els.inputName.value.trim();
     const phoneRaw = els.inputPhone.value.trim();
     const phone = formatRuPhoneForApi(phoneRaw);
+    const carPlateRaw = els.inputCarPlate.value.trim();
+    const carPlate = formatRuCarPlateForApi(carPlateRaw);
 
-    if (!name || !phoneRaw) {
-      showToast("Введите имя и телефон", "error");
+    if (!name || !phoneRaw || !carPlateRaw) {
+      showToast("Введите имя, телефон и госномер", "error");
       return;
     }
 
     if (!phone) {
       showToast("Телефон должен быть в формате +7 (900) 000-00-00", "error");
+      return;
+    }
+
+    if (!carPlate) {
+      showToast("Госномер должен быть в формате А123ВС 77", "error");
       return;
     }
 
@@ -628,6 +728,7 @@
         slotStartLocalIso: selected.localIso,
         name,
         phone,
+        carPlate,
       }),
     });
 
@@ -820,6 +921,7 @@
         <div class="booking-user-info">
           ${buildBookingUserNameLink(booking)}
           <span class="user-phone">${escapeHtml(booking.phone)}</span>
+          <span class="user-phone">Госномер: ${escapeHtml(displayCarPlate(booking.carPlate))}</span>
         </div>
         <div class="booking-actions">
           <button class="action-btn btn-reschedule">Перенести</button>
@@ -873,7 +975,7 @@
       let detailsText = statusText;
 
       if (slot.status === "booked" && slot.details) {
-        detailsText = `${statusText}: ${slot.details.userName}, ${slot.details.phone}`;
+        detailsText = `${statusText}: ${slot.details.userName}, ${slot.details.phone}, ${displayCarPlate(slot.details.carPlate)}`;
       }
 
       if (slot.status === "blocked" && slot.details?.reason) {
@@ -1005,7 +1107,7 @@
     els.rescheduleModalTitle.textContent = actor === "admin" ? "Перенос записи" : "Перенос вашей записи";
     els.rescheduleBookingInfo.textContent =
       actor === "admin"
-        ? `Запись #${booking.id}: ${booking.userName}, ${booking.phone}`
+        ? `Запись #${booking.id}: ${booking.userName}, ${booking.phone}, ${displayCarPlate(booking.carPlate)}`
         : `Текущая запись: ${booking.slotStartLabel}`;
     els.rescheduleDate.value = state.modal.reschedule.date;
     els.rescheduleModal.classList.toggle("raised", actor === "user");
@@ -1162,6 +1264,7 @@
   function bindEvents() {
     els.inputName.addEventListener("input", updateUserActionButton);
     els.inputPhone.addEventListener("input", handlePhoneInput);
+    els.inputCarPlate.addEventListener("input", handleCarPlateInput);
 
     els.userActionBtn.addEventListener("click", () => {
       createBooking().catch(handleError);
