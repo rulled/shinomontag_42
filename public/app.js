@@ -42,7 +42,6 @@
     token: "",
     user: null,
     settings: null,
-    uiMode: "user",
     userView: {
       selectedDate: "",
       daySlots: [],
@@ -77,9 +76,7 @@
     toast: document.getElementById("toast"),
 
     userName: document.getElementById("user_name"),
-    modeSwitch: document.getElementById("mode_switch"),
-    modeUserBtn: document.getElementById("mode_user_btn"),
-    modeAdminBtn: document.getElementById("mode_admin_btn"),
+    adminSaveBtn: document.getElementById("admin_save_btn"),
 
     userScreen: document.getElementById("user_screen"),
     noBookingState: document.getElementById("no-booking-state"),
@@ -90,7 +87,6 @@
 
     bookingFlow: document.getElementById("booking_flow"),
     dateStrip: document.getElementById("date_strip"),
-    userCustomDate: document.getElementById("user_custom_date"),
     slotsContainer: document.getElementById("slots_container"),
 
     formSection: document.getElementById("form_section"),
@@ -103,8 +99,6 @@
 
     adminScreen: document.getElementById("admin_screen"),
     adminHeaderTitle: document.getElementById("admin_header_title"),
-    adminSaveScheduleBtn: document.getElementById("admin_save_schedule_btn"),
-    adminSaveSettingsBtn: document.getElementById("admin_save_settings_btn"),
 
     adminViewCalendar: document.getElementById("admin_view_calendar"),
     adminViewSettings: document.getElementById("admin_view_settings"),
@@ -124,7 +118,6 @@
     adminScheduleList: document.getElementById("admin_schedule_list"),
     adminMinHours: document.getElementById("admin_min_hours"),
     adminHorizonDays: document.getElementById("admin_horizon_days"),
-    adminTimezone: document.getElementById("admin_timezone"),
 
     rescheduleModal: document.getElementById("reschedule_modal"),
     rescheduleCloseBtn: document.getElementById("reschedule_close_btn"),
@@ -347,13 +340,7 @@
     state.userView.selectedDate = todayIso;
     state.adminView.selectedDate = todayIso;
     state.adminView.monthIso = monthIsoFromDate(todayIso);
-    els.userCustomDate.value = todayIso;
-
-    if (isAdmin()) {
-      els.modeSwitch.hidden = false;
-    } else {
-      els.modeSwitch.hidden = true;
-    }
+    els.adminSaveBtn.hidden = true;
   }
 
   function renderDateStrip() {
@@ -383,7 +370,6 @@
         if (isBookingLockedForUser()) return;
         state.userView.selectedDate = dateIso;
         state.userView.selectedSlot = null;
-        els.userCustomDate.value = dateIso;
         renderDateStrip();
         loadUserSlots().catch(handleError);
       });
@@ -558,15 +544,10 @@
 
   function setUiMode(mode) {
     if (mode === "admin" && !isAdmin()) return;
-
-    state.uiMode = mode;
     const isUser = mode === "user";
 
     els.userScreen.hidden = !isUser;
     els.adminScreen.hidden = isUser;
-
-    els.modeUserBtn.classList.toggle("active", isUser);
-    els.modeAdminBtn.classList.toggle("active", !isUser);
 
     if (!isUser) {
       renderAdminTab();
@@ -598,9 +579,14 @@
         row.innerHTML = `
           <span class="day-name">${dayNamesShort[day.dayOfWeek]}</span>
           <div class="day-controls">
-            <input class="day-toggle" type="checkbox" ${day.isWorking ? "checked" : ""} />
-            <select class="time-select day-start">${buildTimeOptions(day.startTime)}</select>
-            <select class="time-select day-end">${buildTimeOptions(day.endTime)}</select>
+            <div class="day-time-range">
+              <select class="time-select day-start">${buildTimeOptions(day.startTime)}</select>
+              <select class="time-select day-end">${buildTimeOptions(day.endTime)}</select>
+            </div>
+            <label class="toggle-switch">
+              <input class="day-toggle" type="checkbox" ${day.isWorking ? "checked" : ""} />
+              <span class="toggle-ui"></span>
+            </label>
           </div>
         `;
 
@@ -638,12 +624,10 @@
     state.adminView.schedule = data.schedule;
     state.adminView.settingsLoaded = true;
 
-    els.adminTimezone.value = data.settings.timezone || "";
     els.adminMinHours.value = String(data.settings.minHoursBeforeBooking ?? 2);
     els.adminHorizonDays.value = data.settings.bookingHorizonDays == null ? "" : String(data.settings.bookingHorizonDays);
 
     renderAdminSchedule();
-    renderDateStrip();
   }
 
   async function loadAdminMonthSummary() {
@@ -752,11 +736,7 @@
         });
 
         showToast("Запись отменена");
-        await Promise.all([
-          loadAdminDateData({ includeSummary: true }),
-          loadMyBooking(),
-          loadUserSlots(),
-        ]);
+        await loadAdminDateData({ includeSummary: true });
       });
 
       els.adminBookings.appendChild(card);
@@ -913,11 +893,7 @@
 
     closeRescheduleModal();
     showToast("Запись перенесена");
-    await Promise.all([
-      loadAdminDateData({ includeSummary: true }),
-      loadMyBooking(),
-      loadUserSlots(),
-    ]);
+    await loadAdminDateData({ includeSummary: true });
   }
 
   async function loadAdminDateData({ includeSummary = false } = {}) {
@@ -951,30 +927,24 @@
     els.adminViewCalendar.hidden = isSettings;
     els.adminViewSettings.hidden = !isSettings;
     els.adminHeaderTitle.textContent = isSettings ? "Настройки" : "Записи";
+    els.adminSaveBtn.hidden = !isSettings;
 
     els.adminNavCalendar.classList.toggle("active", !isSettings);
     els.adminNavSettings.classList.toggle("active", isSettings);
   }
 
-  async function saveAdminSettings() {
-    const timezone = els.adminTimezone.value.trim();
+  async function saveAdminAll() {
     const minHoursBeforeBooking = Number(els.adminMinHours.value || "0");
     const horizonRaw = els.adminHorizonDays.value.trim();
 
     await api("/api/admin/settings", {
       method: "PUT",
       body: JSON.stringify({
-        timezone,
         minHoursBeforeBooking,
         bookingHorizonDays: horizonRaw ? Number(horizonRaw) : null,
       }),
     });
 
-    showToast("Настройки сохранены");
-    await Promise.all([loadMe(), loadUserSlots(), loadAdminSettings(), loadAdminDateData({ includeSummary: true })]);
-  }
-
-  async function saveAdminSchedule() {
     await api("/api/admin/schedule", {
       method: "PUT",
       body: JSON.stringify({
@@ -982,8 +952,8 @@
       }),
     });
 
-    showToast("График сохранен");
-    await Promise.all([loadAdminSettings(), loadAdminDateData()]);
+    showToast("Настройки сохранены");
+    await Promise.all([loadAdminSettings(), loadAdminDateData({ includeSummary: true })]);
   }
 
   function escapeHtml(value) {
@@ -996,14 +966,6 @@
   }
 
   function bindEvents() {
-    els.userCustomDate.addEventListener("change", () => {
-      if (!els.userCustomDate.value) return;
-      state.userView.selectedDate = els.userCustomDate.value;
-      state.userView.selectedSlot = null;
-      renderDateStrip();
-      loadUserSlots().catch(handleError);
-    });
-
     els.inputName.addEventListener("input", updateUserActionButton);
     els.inputPhone.addEventListener("input", handlePhoneInput);
 
@@ -1013,21 +975,6 @@
 
     els.cancelBookingBtn.addEventListener("click", () => {
       cancelBooking().catch(handleError);
-    });
-
-    els.modeUserBtn.addEventListener("click", () => {
-      setUiMode("user");
-    });
-
-    els.modeAdminBtn.addEventListener("click", async () => {
-      setUiMode("admin");
-
-      if (!state.adminView.settingsLoaded) {
-        await loadAdminSettings();
-      }
-      await loadAdminMonthSummary();
-      renderAdminCalendar();
-      await loadAdminDateData();
     });
 
     els.adminNavCalendar.addEventListener("click", () => {
@@ -1061,12 +1008,8 @@
         .catch(handleError);
     });
 
-    els.adminSaveSettingsBtn.addEventListener("click", () => {
-      saveAdminSettings().catch(handleError);
-    });
-
-    els.adminSaveScheduleBtn.addEventListener("click", () => {
-      saveAdminSchedule().catch(handleError);
+    els.adminSaveBtn.addEventListener("click", () => {
+      saveAdminAll().catch(handleError);
     });
 
     els.rescheduleCloseBtn.addEventListener("click", closeRescheduleModal);
@@ -1101,14 +1044,16 @@
     await authenticate();
     await loadMe();
 
-    renderDateStrip();
-    await Promise.all([loadMyBooking(), loadUserSlots()]);
-
     if (isAdmin()) {
+      setUiMode("admin");
       await loadAdminSettings();
       await loadAdminMonthSummary();
       renderAdminCalendar();
       await loadAdminDateData();
+    } else {
+      setUiMode("user");
+      renderDateStrip();
+      await Promise.all([loadMyBooking(), loadUserSlots()]);
     }
   }
 

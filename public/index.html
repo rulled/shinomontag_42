@@ -14,10 +14,7 @@
 
   <div class="profile-bar">
     <span class="profile-name" id="user_name">Авторизация...</span>
-    <div class="mode-switch" id="mode_switch" hidden>
-      <button id="mode_user_btn" class="mode-btn active">Клиент</button>
-      <button id="mode_admin_btn" class="mode-btn">Админ</button>
-    </div>
+    <button class="btn-save" id="admin_save_btn" hidden>Сохранить</button>
   </div>
 
   <main id="user_screen">
@@ -45,8 +42,6 @@
       </div>
       <div class="container slim-bottom">
         <div class="date-strip" id="date_strip"></div>
-        <label class="text-label small-top" for="user_custom_date">Другая дата</label>
-        <input id="user_custom_date" class="date-input" type="date" />
       </div>
 
       <div class="section-title">
@@ -56,7 +51,7 @@
         <div class="slots-grid" id="slots_container"></div>
       </div>
 
-      <div class="container fade-in" id="form_section" hidden>
+      <div class="container fade-in form-section-gap" id="form_section" hidden>
         <div class="card">
           <span class="text-label">Детали записи</span>
           <div class="text-value" id="selected_slot_display">--:--</div>
@@ -102,7 +97,7 @@
 
       <div class="bookings-container" id="admin_bookings"></div>
 
-      <div class="bookings-header">
+      <div class="bookings-header day-slots-header">
         <span class="section-label">Слоты дня</span>
       </div>
       <div class="bookings-container" id="admin_day_slots"></div>
@@ -113,7 +108,6 @@
         <div>
           <span class="section-label">Редактор расписания</span>
           <div class="schedule-list" id="admin_schedule_list"></div>
-          <button class="btn-save section-save-btn" id="admin_save_schedule_btn">Сохранить график</button>
         </div>
 
         <div>
@@ -128,13 +122,7 @@
               <span class="setting-name">Горизонт бронирования (дней)</span>
               <input id="admin_horizon_days" type="number" min="1" max="3650" placeholder="Пусто = без лимита" />
             </label>
-
-            <label class="setting-control">
-              <span class="setting-name">Часовой пояс</span>
-              <input id="admin_timezone" type="text" placeholder="Asia/Krasnoyarsk" />
-            </label>
           </div>
-          <button class="btn-save section-save-btn" id="admin_save_settings_btn">Сохранить настройки</button>
         </div>
       </div>
     </section>

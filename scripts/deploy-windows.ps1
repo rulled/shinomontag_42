@@ -8,6 +8,7 @@ param(
   [string]$AppServiceName = "botfather-app",
   [string]$CaddyServiceName = "botfather-caddy",
   [switch]$SkipSourceSync,
+  [switch]$UseServices,
   [switch]$SkipServices
 )
 
@@ -148,6 +149,35 @@ function Wait-ForHealth {
   return $false
 }
 
+function Try-GitPull {
+  param(
+    [string]$DirPath
+  )
+
+  $gitCommand = Get-Command git -ErrorAction SilentlyContinue
+  if (-not $gitCommand) {
+    Write-Warning "git not found in PATH. Skipping git pull step."
+    return
+  }
+
+  if (-not (Test-Path (Join-Path $DirPath ".git"))) {
+    Write-Warning "No .git directory in $DirPath. Skipping git pull step."
+    return
+  }
+
+  $isRepo = & git -C $DirPath rev-parse --is-inside-work-tree 2>$null
+  if ($LASTEXITCODE -ne 0 -or "$isRepo".Trim() -ne "true") {
+    Write-Warning "$DirPath is not a valid git worktree. Skipping git pull step."
+    return
+  }
+
+  Write-Step "Checking git updates (pull --ff-only)"
+  $pullOutput = & git -C $DirPath pull --ff-only
+  if ($LASTEXITCODE -ne 0) {
+    throw "git pull failed in $DirPath.`n$pullOutput"
+  }
+}
+
 function Stop-ManualProcesses {
   param(
     [string]$TargetDirValue,
@@ -163,7 +193,9 @@ function Stop-ManualProcesses {
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 }
 
-if (-not $SkipServices) {
+$UseWindowsServices = $UseServices -and (-not $SkipServices)
+
+if ($UseWindowsServices) {
   Assert-Admin
 }
 
@@ -187,6 +219,8 @@ if (-not (Test-Path $TargetDir)) {
   Write-Step "Creating target directory: $TargetDir"
   New-Item -ItemType Directory -Path $TargetDir | Out-Null
 }
+
+Try-GitPull -DirPath $TargetDir
 
 if (-not $SkipSourceSync) {
   $sourceFull = (Resolve-Path $SourceDir).Path.TrimEnd("\")
@@ -252,7 +286,7 @@ if ([string]::IsNullOrWhiteSpace($adminIds)) {
 }
 
 Write-Step "Stopping old app processes before npm install"
-if (-not $SkipServices) {
+if ($UseWindowsServices) {
   $appService = Get-Service -Name $AppServiceName -ErrorAction SilentlyContinue
   if ($appService -and $appService.Status -eq "Running") {
     Stop-Service -Name $AppServiceName -Force -ErrorAction SilentlyContinue
@@ -316,7 +350,7 @@ $AppDomain, $ApiDomain {
 "@
 Set-Content -Path $CaddyConfigPath -Value $caddyfile -Encoding ascii
 
-if (-not $SkipServices) {
+if ($UseWindowsServices) {
   Write-Step "Configuring Windows services"
   $appBin = "`"$env:ComSpec`" /c `"$runCmdPath`""
   $caddyBin = "`"$CaddyExe`" run --config `"$CaddyConfigPath`" --adapter caddyfile"
@@ -359,6 +393,9 @@ Write-Host "Next steps:" -ForegroundColor Yellow
 Write-Host "1) Put real BOT_TOKEN and ADMIN_IDS into $envPath (if not set yet)."
 Write-Host "2) Verify HTTPS: https://$ApiDomain/api/health"
 Write-Host "3) Set Mini App URL in @BotFather to https://$AppDomain"
-if ($SkipServices) {
-  Write-Host "4) To run again manually: powershell -ExecutionPolicy Bypass -File .\scripts\deploy-windows.ps1 -SkipServices -AppDomain $AppDomain -ApiDomain $ApiDomain"
+if (-not $UseWindowsServices) {
+  Write-Host "4) To run again manually: powershell -ExecutionPolicy Bypass -File .\scripts\deploy-windows.ps1 -AppDomain $AppDomain -ApiDomain $ApiDomain"
+  Write-Host "5) To enable Windows services mode: add -UseServices"
+} else {
+  Write-Host "4) Windows services mode was used for this run (-UseServices)."
 }

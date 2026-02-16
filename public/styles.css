@@ -361,8 +361,8 @@ button {
   font-weight: 600;
 }
 
-.section-save-btn {
-  margin-top: 10px;
+.form-section-gap {
+  margin-top: 16px;
 }
 
 .calendar-section {
@@ -447,6 +447,10 @@ button {
 
 .bookings-header {
   padding: 0 var(--space-screen-edge) 12px;
+}
+
+.day-slots-header {
+  margin-top: 14px;
 }
 
 .section-label {
@@ -607,14 +611,61 @@ button {
 
 .day-controls {
   display: grid;
-  grid-template-columns: 88px 1fr 1fr;
+  grid-template-columns: 1fr auto;
   gap: 8px;
   align-items: center;
 }
 
+.day-time-range {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.toggle-switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+}
+
 .day-toggle {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-ui {
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--text-tertiary);
+  border: 1px solid #5e5e63;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.toggle-ui::after {
+  content: "";
+  position: absolute;
   width: 18px;
   height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s ease;
+}
+
+.day-toggle:checked + .toggle-ui {
+  background: #34c759;
+  border-color: #34c759;
+}
+
+.day-toggle:checked + .toggle-ui::after {
+  transform: translateX(20px);
 }
 
 .time-select,

@@ -69,33 +69,31 @@
 - Caddy: `C:\caddy\caddy_windows_amd64.exe`
 - приложение: `C:\bot`
 
-Запускать из PowerShell **от имени администратора**:
+Обычный запуск (manual mode, без Windows Services):
 ```powershell
-cd D:\Programing_shit\botfather
+cd C:\bot
 powershell -ExecutionPolicy Bypass -File .\scripts\deploy-windows.ps1 -AppDomain app.<ваш_домен> -ApiDomain api.<ваш_домен>
 ```
 
 Что делает скрипт:
+- проверяет git-обновления (`git pull --ff-only`) в `C:\bot`;
 - синхронизирует файлы проекта в `C:\bot`;
 - создает `.env` из `.env.example` (если нужно);
 - обновляет `MINI_APP_URL`, `APP_ORIGIN`, `API_ORIGIN`;
 - устанавливает npm-зависимости;
 - генерирует `C:\caddy\Caddyfile`;
-- создает/обновляет службы Windows:
-  - `botfather-app`
-  - `botfather-caddy`
-- перезапускает службы и проверяет `http://127.0.0.1:3000/api/health`.
+- по умолчанию запускает backend и Caddy как обычные процессы;
+- проверяет `http://127.0.0.1:3000/api/health`.
 
 Если хотите запускать без копирования из исходной папки (когда уже работаете прямо в `C:\bot`), добавьте флаг:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\deploy-windows.ps1 -SkipSourceSync -AppDomain app.<ваш_домен> -ApiDomain api.<ваш_домен>
 ```
 
-Если не нужен режим Windows Services (ручной запуск), добавьте флаг:
+Режим Windows Services отключен по умолчанию. Чтобы включить его, запускайте PowerShell **от имени администратора** и добавляйте флаг:
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\deploy-windows.ps1 -SkipServices -AppDomain app.<ваш_домен> -ApiDomain api.<ваш_домен>
+powershell -ExecutionPolicy Bypass -File .\scripts\deploy-windows.ps1 -UseServices -AppDomain app.<ваш_домен> -ApiDomain api.<ваш_домен>
 ```
-В этом режиме скрипт запускает backend и Caddy как обычные процессы текущего пользователя.
 
 После деплоя обязательно проверьте `.env`:
 - `BOT_TOKEN=<ваш токен>`
