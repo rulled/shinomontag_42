@@ -62,9 +62,14 @@ function buildUserLink(userId, userName) {
   return `<a href="tg://user?id=${parsedUserId}">${safeName}</a>`;
 }
 
+function formatAdminClientBlock(booking) {
+  const userLink = buildUserLink(booking.userId, booking.userName);
+  const phone = escapeHtml(booking.phone || "");
+  return `Клиент: ${userLink}\nТелефон: ${phone}`;
+}
+
 async function notifyBookingCreated({ booking, timezone }) {
   const slotText = formatSlot(booking.slotStartUtc, timezone);
-  const userLink = buildUserLink(booking.userId, booking.userName);
 
   await sendToUser(
     booking.userId,
@@ -72,7 +77,7 @@ async function notifyBookingCreated({ booking, timezone }) {
   );
 
   await sendToAdmins(
-    `Новая запись #${booking.id}.\nДата и время: ${slotText}\nКлиент: ${userLink}\nТелефон: ${escapeHtml(booking.phone)}`,
+    `Новая запись #${booking.id}.\nДата и время: ${slotText}\n${formatAdminClientBlock(booking)}`,
     { parse_mode: "HTML" }
   );
 }
@@ -87,7 +92,8 @@ async function notifyBookingCanceled({ booking, timezone, canceledByAdmin = fals
   await sendToUser(booking.userId, userMessage);
 
   await sendToAdmins(
-    `Запись #${booking.id} отменена (${canceledByAdmin ? "админ" : "пользователь"}).\nДата и время: ${slotText}\nКлиент: ${booking.userName}\nТелефон: ${booking.phone}${reason ? `\nПричина: ${reason}` : ""}`
+    `Запись #${booking.id} отменена (${canceledByAdmin ? "админ" : "пользователь"}).\nДата и время: ${slotText}\n${formatAdminClientBlock(booking)}${reason ? `\nПричина: ${escapeHtml(reason)}` : ""}`,
+    { parse_mode: "HTML" }
   );
 }
 
@@ -103,7 +109,8 @@ async function notifyBookingRescheduled({ booking, oldSlotUtc, timezone, byAdmin
   );
 
   await sendToAdmins(
-    `Запись #${booking.id} перенесена (${byAdmin ? "админ" : "пользователь"}).\nБыло: ${oldSlotText}\nСтало: ${newSlotText}\nКлиент: ${booking.userName}\nТелефон: ${booking.phone}`
+    `Запись #${booking.id} перенесена (${byAdmin ? "админ" : "пользователь"}).\nБыло: ${oldSlotText}\nСтало: ${newSlotText}\n${formatAdminClientBlock(booking)}`,
+    { parse_mode: "HTML" }
   );
 }
 
