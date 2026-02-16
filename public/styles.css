@@ -63,6 +63,14 @@ button {
   color: var(--text-secondary);
 }
 
+.admin-mode .profile-name {
+  display: none;
+}
+
+.admin-mode .profile-bar {
+  justify-content: flex-end;
+}
+
 .mode-switch {
   display: inline-flex;
   background: var(--bg-card);
@@ -461,6 +469,11 @@ button {
   font-weight: 500;
 }
 
+.section-label + .schedule-list,
+.section-label + .card {
+  margin-top: 8px;
+}
+
 .bookings-container {
   padding: 0 var(--space-screen-edge);
   display: flex;
@@ -502,6 +515,13 @@ button {
 .user-name {
   font-size: 16px;
   font-weight: 600;
+}
+
+.user-link {
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.4);
+  text-underline-offset: 2px;
 }
 
 .user-phone {

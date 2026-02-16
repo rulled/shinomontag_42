@@ -163,7 +163,8 @@ function createPublicRouter(db) {
              phone,
              slot_start_utc AS slotStartUtc,
              status,
-             created_at AS createdAt
+             created_at AS createdAt,
+             updated_at AS updatedAt
            FROM bookings
            WHERE id = ?`
         )

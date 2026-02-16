@@ -81,6 +81,7 @@
     userScreen: document.getElementById("user_screen"),
     noBookingState: document.getElementById("no-booking-state"),
     activeBookingState: document.getElementById("active-booking-state"),
+    activeStatusText: document.getElementById("active_status_text"),
     activeTime: document.getElementById("active-time"),
     activeDetails: document.getElementById("active-details"),
     cancelBookingBtn: document.getElementById("cancel_booking_btn"),
@@ -423,6 +424,7 @@
 
     els.noBookingState.hidden = true;
     els.activeBookingState.hidden = false;
+    els.activeStatusText.textContent = booking.isRescheduled ? "ПЕРЕНЕСЕНО" : "ПОДТВЕРЖДЕНО";
     els.activeTime.textContent = booking.slotStartLabel;
     els.activeDetails.textContent = `${booking.userName} • ${booking.phone}`;
     els.bookingFlow.classList.add("hidden");
@@ -548,6 +550,8 @@
 
     els.userScreen.hidden = !isUser;
     els.adminScreen.hidden = isUser;
+    document.body.classList.toggle("admin-mode", !isUser);
+    els.userName.hidden = !isUser;
 
     if (!isUser) {
       renderAdminTab();
@@ -710,10 +714,9 @@
       card.innerHTML = `
         <div class="booking-header">
           <span class="booking-time">${booking.slotStartLabel.slice(-5)}</span>
-          <span class="booking-secondary">#${booking.id}</span>
         </div>
         <div class="booking-user-info">
-          <span class="user-name">${escapeHtml(booking.userName)}</span>
+          ${buildBookingUserNameLink(booking)}
           <span class="user-phone">${escapeHtml(booking.phone)}</span>
         </div>
         <div class="booking-actions">
@@ -926,7 +929,7 @@
 
     els.adminViewCalendar.hidden = isSettings;
     els.adminViewSettings.hidden = !isSettings;
-    els.adminHeaderTitle.textContent = isSettings ? "Настройки" : "Записи";
+    els.adminHeaderTitle.textContent = isSettings ? "Редактор расписания" : "Записи";
     els.adminSaveBtn.hidden = !isSettings;
 
     els.adminNavCalendar.classList.toggle("active", !isSettings);
@@ -963,6 +966,17 @@
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#039;");
+  }
+
+  function buildBookingUserNameLink(booking) {
+    const safeName = escapeHtml(booking.userName || "Пользователь");
+    const userId = Number(booking.userId);
+
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return `<span class="user-name">${safeName}</span>`;
+    }
+
+    return `<a class="user-name user-link" href="tg://user?id=${userId}">${safeName}</a>`;
   }
 
   function bindEvents() {

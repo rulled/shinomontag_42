@@ -271,6 +271,10 @@ function checkSlotBookableForAdmin(db, slotStartLocalIso, ignoreBookingId = null
 
 function formatBooking(booking, timezone) {
   const local = DateTime.fromISO(booking.slotStartUtc, { zone: "utc" }).setZone(timezone);
+  const isRescheduled =
+    Boolean(booking.updatedAt) &&
+    Boolean(booking.createdAt) &&
+    booking.updatedAt !== booking.createdAt;
 
   return {
     id: booking.id,
@@ -282,6 +286,8 @@ function formatBooking(booking, timezone) {
     slotStartLocalIso: local.toISO({ suppressMilliseconds: true, includeOffset: false }),
     slotStartLabel: local.toFormat("dd.LL.yyyy HH:mm"),
     createdAt: booking.createdAt,
+    updatedAt: booking.updatedAt,
+    isRescheduled,
   };
 }
 
@@ -295,7 +301,8 @@ function getUpcomingBookingByUser(db, userId) {
          phone,
          slot_start_utc AS slotStartUtc,
          status,
-         created_at AS createdAt
+         created_at AS createdAt,
+         updated_at AS updatedAt
        FROM bookings
        WHERE user_id = ? AND status = 'active'
        ORDER BY slot_start_utc ASC

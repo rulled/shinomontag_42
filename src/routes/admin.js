@@ -119,7 +119,8 @@ function createAdminRouter(db) {
            phone,
            slot_start_utc AS slotStartUtc,
            status,
-           created_at AS createdAt
+           created_at AS createdAt,
+           updated_at AS updatedAt
          FROM bookings
          WHERE slot_start_utc >= ? AND slot_start_utc < ?
          ORDER BY slot_start_utc ASC`
@@ -260,7 +261,8 @@ function createAdminRouter(db) {
            phone,
            slot_start_utc AS slotStartUtc,
            status,
-           created_at AS createdAt
+           created_at AS createdAt,
+           updated_at AS updatedAt
          FROM bookings
          WHERE id = ? AND status = 'active'`
       )
@@ -314,7 +316,8 @@ function createAdminRouter(db) {
            phone,
            slot_start_utc AS slotStartUtc,
            status,
-           created_at AS createdAt
+           created_at AS createdAt,
+           updated_at AS updatedAt
          FROM bookings
          WHERE id = ? AND status = 'active'`
       )
