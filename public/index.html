@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Запись на шиномонтаж</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <main class="container">
+    <header class="header">
+      <h1>Запись на шиномонтаж</h1>
+      <p id="userInfo">Авторизация...</p>
+    </header>
+
+    <section class="card" id="alerts"></section>
+
+    <section class="card">
+      <h2>Моя запись</h2>
+      <div id="myBooking" class="muted">Загрузка...</div>
+      <button id="cancelBookingBtn" class="danger" hidden>Отменить запись</button>
+    </section>
+
+    <section class="card" id="bookSection">
+      <h2>Новая запись</h2>
+      <div class="grid two">
+        <label>
+          Дата
+          <input type="date" id="bookingDate" />
+        </label>
+        <label>
+          Имя
+          <input type="text" id="name" placeholder="Ваше имя" maxlength="80" />
+        </label>
+      </div>
+
+      <label>
+        Телефон
+        <input type="tel" id="phone" placeholder="+7..." maxlength="32" />
+      </label>
+
+      <div>
+        <h3>Свободные слоты</h3>
+        <div id="slots" class="slots"></div>
+      </div>
+
+      <button id="createBookingBtn" class="primary" disabled>Записаться</button>
+    </section>
+
+    <section class="card" id="adminSection" hidden>
+      <h2>Панель администратора</h2>
+
+      <div class="admin-block">
+        <h3>Настройки записи</h3>
+        <div class="grid two">
+          <label>
+            Часовой пояс
+            <input type="text" id="adminTimezone" />
+          </label>
+          <label>
+            Минимум часов до записи
+            <input type="number" id="adminMinHours" min="0" max="168" />
+          </label>
+        </div>
+        <label>
+          Горизонт записи (дней, пусто = без лимита)
+          <input type="number" id="adminHorizonDays" min="1" max="3650" />
+        </label>
+        <button id="saveSettingsBtn" class="primary">Сохранить настройки</button>
+      </div>
+
+      <div class="admin-block">
+        <h3>Недельный график</h3>
+        <div id="scheduleRows"></div>
+        <button id="saveScheduleBtn" class="primary">Сохранить график</button>
+      </div>
+
+      <div class="admin-block">
+        <h3>Управление слотами дня</h3>
+        <label>
+          Дата
+          <input type="date" id="adminDate" />
+        </label>
+        <button id="refreshAdminDayBtn">Обновить день</button>
+        <div id="adminSlots" class="admin-slots"></div>
+      </div>
+
+      <div class="admin-block">
+        <h3>Записи на выбранную дату</h3>
+        <button id="refreshAdminBookingsBtn">Обновить список записей</button>
+        <div id="adminBookings"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
