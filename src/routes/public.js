@@ -17,6 +17,7 @@ const {
   notifyBookingCanceled,
   notifyBookingRescheduled,
 } = require("../services/notifyService");
+const { getLiveRevision, bumpLiveRevision } = require("../services/liveUpdates");
 
 function createPublicRouter(db) {
   const router = express.Router();
@@ -85,6 +86,10 @@ function createPublicRouter(db) {
   }
 
   router.use(authRequired);
+
+  router.get("/updates/version", (req, res) => {
+    return res.json({ revision: getLiveRevision() });
+  });
 
   router.get("/me", (req, res) => {
     const settings = getSettings(db);
@@ -176,6 +181,7 @@ function createPublicRouter(db) {
         booking: created,
         timezone: check.settings.timezone,
       });
+      bumpLiveRevision();
 
       return res.json({ booking: formatBooking(created, check.settings.timezone) });
     } catch (error) {
@@ -226,6 +232,7 @@ function createPublicRouter(db) {
       timezone: settings.timezone,
       canceledByAdmin: false,
     });
+    bumpLiveRevision();
 
     return res.json({ ok: true });
   });
@@ -297,6 +304,7 @@ function createPublicRouter(db) {
       timezone: check.settings.timezone,
       byAdmin: false,
     });
+    bumpLiveRevision();
 
     return res.json({ booking: formatBooking(updatedBooking, check.settings.timezone) });
   });

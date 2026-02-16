@@ -18,6 +18,7 @@ const {
   notifyBookingCanceled,
   notifyBookingRescheduled,
 } = require("../services/notifyService");
+const { bumpLiveRevision } = require("../services/liveUpdates");
 
 function createAdminRouter(db) {
   const router = express.Router();
@@ -52,6 +53,7 @@ function createAdminRouter(db) {
 
     try {
       updateSettings(db, parsed.data);
+      bumpLiveRevision();
       return res.json({ settings: getSettings(db) });
     } catch (error) {
       console.error("[admin] update settings failed:", error);
@@ -78,6 +80,7 @@ function createAdminRouter(db) {
 
     try {
       updateWeeklySchedule(db, parsed.data.days);
+      bumpLiveRevision();
       return res.json({ schedule: getWeeklySchedule(db) });
     } catch (error) {
       return res.status(400).json({ error: error.message || "Не удалось обновить расписание" });
@@ -211,6 +214,7 @@ function createAdminRouter(db) {
            VALUES (?, ?, ?, ?)`
         )
         .run(slotUtcIso, parsed.data.reason || "", req.user.userId, nowUtc);
+      bumpLiveRevision();
 
       return res.json({ id: result.lastInsertRowid, slotStartUtc: slotUtcIso });
     } catch (error) {
@@ -233,6 +237,7 @@ function createAdminRouter(db) {
     if (!result.changes) {
       return res.status(404).json({ error: "Блокировка не найдена" });
     }
+    bumpLiveRevision();
 
     return res.json({ ok: true });
   });
@@ -288,6 +293,7 @@ function createAdminRouter(db) {
       canceledByAdmin: true,
       reason: parsed.data.reason || "",
     });
+    bumpLiveRevision();
 
     return res.json({ ok: true });
   });
@@ -355,6 +361,7 @@ function createAdminRouter(db) {
       oldSlotUtc,
       timezone: check.settings.timezone,
     });
+    bumpLiveRevision();
 
     return res.json({ booking: formatBooking(updatedBooking, check.settings.timezone) });
   });

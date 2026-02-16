@@ -1,5 +1,7 @@
 (() => {
-  const tg = window.Telegram?.WebApp;
+  function getTelegramWebApp() {
+    return window.Telegram?.WebApp || null;
+  }
 
   const dayNamesLong = {
     1: "Понедельник",
@@ -42,6 +44,11 @@
     token: "",
     user: null,
     settings: null,
+    liveSync: {
+      revision: null,
+      inFlight: false,
+      timerId: null,
+    },
     userView: {
       selectedDate: "",
       daySlots: [],
@@ -155,6 +162,10 @@
     setTimeout(() => {
       els.toast.classList.remove("show");
     }, 3200);
+  }
+
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   async function api(path, options = {}) {
@@ -316,8 +327,20 @@
     return Boolean(state.userView.myBooking);
   }
 
+  async function waitForTelegramInitData(timeoutMs = 3500) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const initData = getTelegramWebApp()?.initData;
+      if (initData) {
+        return initData;
+      }
+      await sleep(120);
+    }
+    return getTelegramWebApp()?.initData || "";
+  }
+
   async function authenticate() {
-    const initData = tg?.initData;
+    const initData = await waitForTelegramInitData();
 
     if (initData) {
       const data = await api("/api/auth/telegram", {
@@ -335,7 +358,7 @@
       return;
     }
 
-    throw new Error("Mini App должен запускаться из Telegram");
+    throw new Error("Не удалось получить данные Telegram Mini App. Закройте и откройте приложение еще раз.");
   }
 
   async function loadMe() {
@@ -486,6 +509,60 @@
     const data = await api("/api/bookings/my");
     state.userView.myBooking = data.booking;
     renderMyBooking();
+  }
+
+  async function loadLiveRevision() {
+    const data = await api("/api/updates/version");
+    state.liveSync.revision = Number(data.revision);
+  }
+
+  async function runLiveSyncTick() {
+    if (state.liveSync.inFlight || document.hidden) {
+      return;
+    }
+
+    state.liveSync.inFlight = true;
+    try {
+      const data = await api("/api/updates/version");
+      const remoteRevision = Number(data.revision);
+
+      if (!Number.isFinite(remoteRevision)) {
+        return;
+      }
+
+      if (state.liveSync.revision == null) {
+        state.liveSync.revision = remoteRevision;
+        return;
+      }
+
+      if (remoteRevision === state.liveSync.revision) {
+        return;
+      }
+
+      state.liveSync.revision = remoteRevision;
+
+      if (isAdmin()) {
+        await Promise.all([loadAdminMonthSummary(), loadAdminDateData(), loadAdminSettings()]);
+        renderAdminCalendar();
+        renderAdminTab();
+      } else {
+        await Promise.all([loadMyBooking(), loadUserSlots()]);
+      }
+    } catch (error) {
+      console.error("[live-sync] tick failed:", error);
+    } finally {
+      state.liveSync.inFlight = false;
+    }
+  }
+
+  function startLiveSync() {
+    if (state.liveSync.timerId) {
+      clearInterval(state.liveSync.timerId);
+    }
+
+    state.liveSync.timerId = setInterval(() => {
+      runLiveSyncTick().catch(() => {});
+    }, 5000);
   }
 
   async function loadUserSlots() {
@@ -1162,6 +1239,7 @@
   }
 
   async function bootstrap() {
+    const tg = getTelegramWebApp();
     if (tg) {
       tg.ready();
       tg.expand();
@@ -1183,6 +1261,9 @@
       renderDateStrip();
       await Promise.all([loadMyBooking(), loadUserSlots()]);
     }
+
+    await loadLiveRevision();
+    startLiveSync();
   }
 
   bootstrap().catch(handleError);

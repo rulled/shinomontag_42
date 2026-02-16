@@ -1,6 +1,7 @@
 const { DateTime } = require("luxon");
 const { getSettings } = require("./services/settingsService");
 const { notifyReminder } = require("./services/notifyService");
+const { bumpLiveRevision } = require("./services/liveUpdates");
 
 async function runReminderTick(db) {
   const settings = getSettings(db);
@@ -8,11 +9,15 @@ async function runReminderTick(db) {
   const nowUtcIso = DateTime.utc().toISO({ suppressMilliseconds: true });
   const next24hIso = DateTime.utc().plus({ hours: 24 }).toISO({ suppressMilliseconds: true });
 
-  db.prepare(
+  const completedResult = db.prepare(
     `UPDATE bookings
      SET status = 'completed', updated_at = ?
      WHERE status = 'active' AND slot_start_utc <= ?`
   ).run(nowUtcIso, DateTime.utc().minus({ hours: 1 }).toISO({ suppressMilliseconds: true }));
+
+  if (completedResult.changes > 0) {
+    bumpLiveRevision();
+  }
 
   const bookings = db
     .prepare(
