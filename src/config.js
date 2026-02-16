@@ -23,6 +23,7 @@ const config = {
   apiOrigin: process.env.API_ORIGIN || "https://api.example.com",
   dbPath: process.env.DB_PATH || path.join(process.cwd(), "data", "app.db"),
   allowDevLogin: process.env.ALLOW_DEV_LOGIN === "true",
+  telegramInitDataMaxAgeSec: Number(process.env.TELEGRAM_INITDATA_MAX_AGE_SEC || 604800),
 };
 
 module.exports = { config };

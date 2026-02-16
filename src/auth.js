@@ -50,7 +50,7 @@ function verifyToken(token) {
   return payload;
 }
 
-function verifyTelegramInitData(initData, botToken, maxAgeSeconds = 86400) {
+function verifyTelegramInitData(initData, botToken, maxAgeSeconds = config.telegramInitDataMaxAgeSec || 86400) {
   if (!initData || !botToken) {
     return { ok: false, error: "initData или bot token отсутствуют" };
   }

@@ -46,12 +46,23 @@ async function bootstrap() {
   app.use("/api", createPublicRouter(db));
 
   const publicDir = path.join(process.cwd(), "public");
-  app.use(express.static(publicDir));
+  app.use(
+    express.static(publicDir, {
+      etag: true,
+      lastModified: true,
+      setHeaders: (res) => {
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+        res.setHeader("Pragma", "no-cache");
+      },
+    })
+  );
 
   app.get(/.*/, (req, res) => {
     if (req.path.startsWith("/api/")) {
       return res.status(404).json({ error: "Route not found" });
     }
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
     return res.sendFile(path.join(publicDir, "index.html"));
   });
 

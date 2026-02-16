@@ -51,6 +51,7 @@ button {
 
 .profile-bar {
   padding: 0 var(--space-screen-edge);
+  padding-top: 12px;
   margin-bottom: 8px;
   display: flex;
   justify-content: space-between;

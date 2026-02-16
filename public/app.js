@@ -327,7 +327,7 @@
     return Boolean(state.userView.myBooking);
   }
 
-  async function waitForTelegramInitData(timeoutMs = 3500) {
+  async function waitForTelegramInitData(timeoutMs = 12000) {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       const initData = getTelegramWebApp()?.initData;
@@ -343,13 +343,22 @@
     const initData = await waitForTelegramInitData();
 
     if (initData) {
-      const data = await api("/api/auth/telegram", {
-        method: "POST",
-        body: JSON.stringify({ initData }),
-      });
-      state.token = data.token;
-      state.user = data.user;
-      return;
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        try {
+          const data = await api("/api/auth/telegram", {
+            method: "POST",
+            body: JSON.stringify({ initData }),
+          });
+          state.token = data.token;
+          state.user = data.user;
+          return;
+        } catch (error) {
+          if (attempt === 3) {
+            throw error;
+          }
+          await sleep(350);
+        }
+      }
     }
 
     const devToken = localStorage.getItem("devToken");
@@ -1235,6 +1244,9 @@
 
   function handleError(error) {
     console.error(error);
+    if (els.userName && els.userName.textContent === "Авторизация...") {
+      els.userName.textContent = "Ошибка авторизации";
+    }
     showToast(error?.message || "Неизвестная ошибка", "error");
   }
 
