@@ -17,9 +17,24 @@ async function sendToUser(userId, text) {
   }
 }
 
-async function sendToAdmins(text) {
+async function sendToUserWithOptions(userId, text, options = {}) {
   if (!bot) return;
-  const jobs = config.adminIds.map((adminId) => sendToUser(adminId, text));
+  try {
+    await bot.api.sendMessage(userId, text, {
+      disable_web_page_preview: true,
+      ...options,
+    });
+  } catch (error) {
+    // Do not throw notification failures into business flow.
+    console.error(`[notify] user message failed (${userId}):`, error.message);
+  }
+}
+
+async function sendToAdmins(text, options = {}) {
+  if (!bot) return;
+  const jobs = config.adminIds.map((adminId) =>
+    sendToUserWithOptions(adminId, text, options)
+  );
   await Promise.all(jobs);
 }
 
@@ -29,8 +44,27 @@ function formatSlot(slotStartUtc, timezone) {
     .toFormat("dd.LL.yyyy HH:mm");
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function buildUserLink(userId, userName) {
+  const safeName = escapeHtml(userName || "Пользователь");
+  const parsedUserId = Number(userId);
+  if (!Number.isInteger(parsedUserId) || parsedUserId <= 0) {
+    return safeName;
+  }
+  return `<a href="tg://user?id=${parsedUserId}">${safeName}</a>`;
+}
+
 async function notifyBookingCreated({ booking, timezone }) {
   const slotText = formatSlot(booking.slotStartUtc, timezone);
+  const userLink = buildUserLink(booking.userId, booking.userName);
 
   await sendToUser(
     booking.userId,
@@ -38,7 +72,8 @@ async function notifyBookingCreated({ booking, timezone }) {
   );
 
   await sendToAdmins(
-    `Новая запись #${booking.id}.\nДата и время: ${slotText}\nКлиент: ${booking.userName}\nТелефон: ${booking.phone}\nuser_id: ${booking.userId}`
+    `Новая запись #${booking.id}.\nДата и время: ${slotText}\nКлиент: ${userLink}\nТелефон: ${escapeHtml(booking.phone)}`,
+    { parse_mode: "HTML" }
   );
 }
 
@@ -56,17 +91,19 @@ async function notifyBookingCanceled({ booking, timezone, canceledByAdmin = fals
   );
 }
 
-async function notifyBookingRescheduled({ booking, oldSlotUtc, timezone }) {
+async function notifyBookingRescheduled({ booking, oldSlotUtc, timezone, byAdmin = true }) {
   const oldSlotText = formatSlot(oldSlotUtc, timezone);
   const newSlotText = formatSlot(booking.slotStartUtc, timezone);
 
   await sendToUser(
     booking.userId,
-    `Ваша запись перенесена администратором.\nБыло: ${oldSlotText}\nСтало: ${newSlotText}`
+    byAdmin
+      ? `Ваша запись перенесена администратором.\nБыло: ${oldSlotText}\nСтало: ${newSlotText}`
+      : `Вы перенесли запись.\nБыло: ${oldSlotText}\nСтало: ${newSlotText}`
   );
 
   await sendToAdmins(
-    `Запись #${booking.id} перенесена.\nБыло: ${oldSlotText}\nСтало: ${newSlotText}\nКлиент: ${booking.userName}\nТелефон: ${booking.phone}`
+    `Запись #${booking.id} перенесена (${byAdmin ? "админ" : "пользователь"}).\nБыло: ${oldSlotText}\nСтало: ${newSlotText}\nКлиент: ${booking.userName}\nТелефон: ${booking.phone}`
   );
 }
 

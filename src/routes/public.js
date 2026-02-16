@@ -8,12 +8,14 @@ const { getSettings } = require("../services/settingsService");
 const {
   getDaySlotsDetailed,
   checkSlotBookable,
+  checkSlotReschedulableForUser,
   formatBooking,
   getUpcomingBookingByUser,
 } = require("../services/slotService");
 const {
   notifyBookingCreated,
   notifyBookingCanceled,
+  notifyBookingRescheduled,
 } = require("../services/notifyService");
 
 function createPublicRouter(db) {
@@ -226,6 +228,77 @@ function createPublicRouter(db) {
     });
 
     return res.json({ ok: true });
+  });
+
+  router.post("/bookings/my/reschedule", async (req, res) => {
+    const schema = z.object({
+      newSlotStartLocalIso: z.string().min(1),
+    });
+
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Новая дата обязательна" });
+    }
+
+    const activeBooking = db
+      .prepare(
+        `SELECT
+           id,
+           user_id AS userId,
+           user_name AS userName,
+           phone,
+           slot_start_utc AS slotStartUtc,
+           status,
+           created_at AS createdAt,
+           updated_at AS updatedAt
+         FROM bookings
+         WHERE user_id = ? AND status = 'active'
+         ORDER BY slot_start_utc ASC
+         LIMIT 1`
+      )
+      .get(req.user.userId);
+
+    if (!activeBooking) {
+      return res.status(404).json({ error: "Активная запись не найдена" });
+    }
+
+    const check = checkSlotReschedulableForUser(
+      db,
+      req.user.userId,
+      parsed.data.newSlotStartLocalIso,
+      activeBooking.id
+    );
+    if (!check.ok) {
+      return res.status(400).json({ error: check.error });
+    }
+
+    const oldSlotUtc = activeBooking.slotStartUtc;
+    const nowUtc = DateTime.utc().toISO({ suppressMilliseconds: true });
+
+    db.transaction(() => {
+      db.prepare(
+        `UPDATE bookings
+         SET slot_start_utc = ?, updated_at = ?
+         WHERE id = ?`
+      ).run(check.slotUtcIso, nowUtc, activeBooking.id);
+
+      db.prepare("DELETE FROM reminder_logs WHERE booking_id = ?").run(activeBooking.id);
+    })();
+
+    const updatedBooking = {
+      ...activeBooking,
+      slotStartUtc: check.slotUtcIso,
+      updatedAt: nowUtc,
+    };
+
+    await notifyBookingRescheduled({
+      booking: updatedBooking,
+      oldSlotUtc,
+      timezone: check.settings.timezone,
+      byAdmin: false,
+    });
+
+    return res.json({ booking: formatBooking(updatedBooking, check.settings.timezone) });
   });
 
   return router;

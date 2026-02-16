@@ -57,11 +57,17 @@
       daySlots: [],
       bookings: [],
       monthSummary: {},
+    },
+    modal: {
       reschedule: {
+        actor: null,
         booking: null,
         date: "",
         daySlots: [],
         selectedSlot: null,
+      },
+      reason: {
+        resolver: null,
       },
     },
   };
@@ -84,6 +90,7 @@
     activeStatusText: document.getElementById("active_status_text"),
     activeTime: document.getElementById("active-time"),
     activeDetails: document.getElementById("active-details"),
+    rescheduleBookingBtn: document.getElementById("reschedule_booking_btn"),
     cancelBookingBtn: document.getElementById("cancel_booking_btn"),
 
     bookingFlow: document.getElementById("booking_flow"),
@@ -121,11 +128,20 @@
     adminHorizonDays: document.getElementById("admin_horizon_days"),
 
     rescheduleModal: document.getElementById("reschedule_modal"),
+    rescheduleModalTitle: document.getElementById("reschedule_modal_title"),
     rescheduleCloseBtn: document.getElementById("reschedule_close_btn"),
     rescheduleBookingInfo: document.getElementById("reschedule_booking_info"),
     rescheduleDate: document.getElementById("reschedule_date"),
     rescheduleSlots: document.getElementById("reschedule_slots"),
     rescheduleSubmitBtn: document.getElementById("reschedule_submit_btn"),
+
+    reasonModal: document.getElementById("reason_modal"),
+    reasonModalTitle: document.getElementById("reason_modal_title"),
+    reasonModalLabel: document.getElementById("reason_modal_label"),
+    reasonInput: document.getElementById("reason_input"),
+    reasonCloseBtn: document.getElementById("reason_close_btn"),
+    reasonCancelBtn: document.getElementById("reason_cancel_btn"),
+    reasonSubmitBtn: document.getElementById("reason_submit_btn"),
   };
 
   function pad2(value) {
@@ -732,7 +748,14 @@
       });
 
       cancelBtn.addEventListener("click", async () => {
-        const reason = window.prompt("Причина отмены (необязательно)", "") || "";
+        const reason = await askReasonInput({
+          title: "Отмена записи",
+          label: "Причина отмены (необязательно)",
+          submitText: "Отменить запись",
+          placeholder: "Комментарий для клиента",
+        });
+        if (reason == null) return;
+
         await api(`/api/admin/bookings/${booking.id}/cancel`, {
           method: "POST",
           body: JSON.stringify({ reason }),
@@ -783,7 +806,14 @@
         blockBtn.className = "slot-action";
         blockBtn.textContent = "Блок";
         blockBtn.addEventListener("click", async () => {
-          const reason = window.prompt("Причина блокировки (необязательно)", "") || "";
+          const reason = await askReasonInput({
+            title: "Блокировка слота",
+            label: "Причина блокировки (необязательно)",
+            submitText: "Заблокировать",
+            placeholder: "Например: перерыв",
+          });
+          if (reason == null) return;
+
           await api("/api/admin/blocked-slots", {
             method: "POST",
             body: JSON.stringify({ slotStartLocalIso: slot.localIso, reason }),
@@ -813,23 +843,31 @@
   }
 
   function closeRescheduleModal() {
-    state.adminView.reschedule.booking = null;
-    state.adminView.reschedule.date = "";
-    state.adminView.reschedule.daySlots = [];
-    state.adminView.reschedule.selectedSlot = null;
+    state.modal.reschedule.actor = null;
+    state.modal.reschedule.booking = null;
+    state.modal.reschedule.date = "";
+    state.modal.reschedule.daySlots = [];
+    state.modal.reschedule.selectedSlot = null;
     els.rescheduleModal.classList.add("hidden");
+    els.rescheduleModal.classList.remove("raised");
     els.rescheduleSlots.innerHTML = "";
     els.rescheduleSubmitBtn.disabled = true;
   }
 
+  function getRescheduleOptions(current) {
+    return current.daySlots.filter((slot) => {
+      if (slot.status === "free") return true;
+      if (!current.booking) return false;
+
+      return slot.localIso === current.booking.slotStartLocalIso;
+    });
+  }
+
   function renderRescheduleSlots() {
-    const current = state.adminView.reschedule;
+    const current = state.modal.reschedule;
     els.rescheduleSlots.innerHTML = "";
 
-    const options = current.daySlots.filter((slot) => {
-      if (slot.status === "free") return true;
-      return slot.status === "booked" && slot.details?.id === current.booking?.id;
-    });
+    const options = getRescheduleOptions(current);
 
     if (!options.length) {
       els.rescheduleSlots.innerHTML = `<div class="empty-state">Нет доступных слотов на выбранную дату</div>`;
@@ -838,7 +876,7 @@
     }
 
     options.forEach((slot) => {
-      const isCurrentBookingSlot = slot.status === "booked" && slot.details?.id === current.booking?.id;
+      const isCurrentBookingSlot = slot.localIso === current.booking?.slotStartLocalIso;
       const isSelected = current.selectedSlot?.localIso === slot.localIso;
       const btn = document.createElement("button");
       btn.className = `modal-slot ${isCurrentBookingSlot ? "free" : slot.status} ${isSelected ? "selected" : ""}`;
@@ -854,9 +892,13 @@
   }
 
   async function loadRescheduleDaySlots() {
-    const current = state.adminView.reschedule;
+    const current = state.modal.reschedule;
     if (!current.date) return;
-    const data = await api(`/api/admin/day?date=${encodeURIComponent(current.date)}`);
+    const path =
+      current.actor === "admin"
+        ? `/api/admin/day?date=${encodeURIComponent(current.date)}`
+        : `/api/slots/day?date=${encodeURIComponent(current.date)}`;
+    const data = await api(path);
     current.daySlots = data.slots;
     if (
       current.selectedSlot &&
@@ -867,14 +909,20 @@
     renderRescheduleSlots();
   }
 
-  async function openRescheduleModal(booking) {
-    state.adminView.reschedule.booking = booking;
-    state.adminView.reschedule.date = booking.slotStartLocalIso.slice(0, 10);
-    state.adminView.reschedule.daySlots = [];
-    state.adminView.reschedule.selectedSlot = null;
+  async function openRescheduleModal(booking, actor = "admin") {
+    state.modal.reschedule.actor = actor;
+    state.modal.reschedule.booking = booking;
+    state.modal.reschedule.date = booking.slotStartLocalIso.slice(0, 10);
+    state.modal.reschedule.daySlots = [];
+    state.modal.reschedule.selectedSlot = null;
 
-    els.rescheduleBookingInfo.textContent = `Запись #${booking.id}: ${booking.userName}, ${booking.phone}`;
-    els.rescheduleDate.value = state.adminView.reschedule.date;
+    els.rescheduleModalTitle.textContent = actor === "admin" ? "Перенос записи" : "Перенос вашей записи";
+    els.rescheduleBookingInfo.textContent =
+      actor === "admin"
+        ? `Запись #${booking.id}: ${booking.userName}, ${booking.phone}`
+        : `Текущая запись: ${booking.slotStartLabel}`;
+    els.rescheduleDate.value = state.modal.reschedule.date;
+    els.rescheduleModal.classList.toggle("raised", actor === "user");
     els.rescheduleModal.classList.remove("hidden");
     els.rescheduleSlots.innerHTML = `<div class="empty-state">Загрузка слотов...</div>`;
     els.rescheduleSubmitBtn.disabled = true;
@@ -883,20 +931,32 @@
   }
 
   async function submitRescheduleModal() {
-    const current = state.adminView.reschedule;
+    const current = state.modal.reschedule;
     if (!current.booking || !current.selectedSlot) {
       showToast("Выберите новый слот", "error");
       return;
     }
 
-    await api(`/api/admin/bookings/${current.booking.id}/reschedule`, {
-      method: "POST",
-      body: JSON.stringify({ newSlotStartLocalIso: current.selectedSlot.localIso }),
-    });
+    if (current.actor === "admin") {
+      await api(`/api/admin/bookings/${current.booking.id}/reschedule`, {
+        method: "POST",
+        body: JSON.stringify({ newSlotStartLocalIso: current.selectedSlot.localIso }),
+      });
+    } else {
+      await api("/api/bookings/my/reschedule", {
+        method: "POST",
+        body: JSON.stringify({ newSlotStartLocalIso: current.selectedSlot.localIso }),
+      });
+    }
 
     closeRescheduleModal();
     showToast("Запись перенесена");
-    await loadAdminDateData({ includeSummary: true });
+
+    if (current.actor === "admin") {
+      await loadAdminDateData({ includeSummary: true });
+    } else {
+      await Promise.all([loadMyBooking(), loadUserSlots()]);
+    }
   }
 
   async function loadAdminDateData({ includeSummary = false } = {}) {
@@ -979,6 +1039,40 @@
     return `<a class="user-name user-link" href="tg://user?id=${userId}">${safeName}</a>`;
   }
 
+  function closeReasonModal({ resolveWith = null } = {}) {
+    els.reasonModal.classList.add("hidden");
+    els.reasonInput.value = "";
+
+    const resolver = state.modal.reason.resolver;
+    state.modal.reason.resolver = null;
+    if (resolver) {
+      resolver(resolveWith);
+    }
+  }
+
+  function askReasonInput({ title, label, submitText, placeholder = "" }) {
+    return new Promise((resolve) => {
+      state.modal.reason.resolver = resolve;
+
+      els.reasonModalTitle.textContent = title;
+      els.reasonModalLabel.textContent = label;
+      els.reasonSubmitBtn.textContent = submitText;
+      els.reasonInput.placeholder = placeholder;
+      els.reasonInput.value = "";
+
+      els.reasonModal.classList.remove("hidden");
+      setTimeout(() => els.reasonInput.focus(), 0);
+    });
+  }
+
+  async function openUserRescheduleModal() {
+    if (!state.userView.myBooking) {
+      showToast("Активная запись не найдена", "error");
+      return;
+    }
+    await openRescheduleModal(state.userView.myBooking, "user");
+  }
+
   function bindEvents() {
     els.inputName.addEventListener("input", updateUserActionButton);
     els.inputPhone.addEventListener("input", handlePhoneInput);
@@ -989,6 +1083,9 @@
 
     els.cancelBookingBtn.addEventListener("click", () => {
       cancelBooking().catch(handleError);
+    });
+    els.rescheduleBookingBtn.addEventListener("click", () => {
+      openUserRescheduleModal().catch(handleError);
     });
 
     els.adminNavCalendar.addEventListener("click", () => {
@@ -1033,12 +1130,29 @@
       }
     });
     els.rescheduleDate.addEventListener("change", () => {
-      state.adminView.reschedule.date = els.rescheduleDate.value;
-      state.adminView.reschedule.selectedSlot = null;
+      state.modal.reschedule.date = els.rescheduleDate.value;
+      state.modal.reschedule.selectedSlot = null;
       loadRescheduleDaySlots().catch(handleError);
     });
     els.rescheduleSubmitBtn.addEventListener("click", () => {
       submitRescheduleModal().catch(handleError);
+    });
+
+    els.reasonCloseBtn.addEventListener("click", () => closeReasonModal({ resolveWith: null }));
+    els.reasonCancelBtn.addEventListener("click", () => closeReasonModal({ resolveWith: null }));
+    els.reasonModal.addEventListener("click", (event) => {
+      if (event.target === els.reasonModal) {
+        closeReasonModal({ resolveWith: null });
+      }
+    });
+    els.reasonSubmitBtn.addEventListener("click", () => {
+      closeReasonModal({ resolveWith: els.reasonInput.value.trim() });
+    });
+    els.reasonInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        closeReasonModal({ resolveWith: els.reasonInput.value.trim() });
+      }
     });
   }
 

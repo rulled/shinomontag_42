@@ -245,6 +245,34 @@ function checkSlotBookable(db, userId, slotStartLocalIso) {
   return baseCheck;
 }
 
+function checkSlotReschedulableForUser(db, userId, slotStartLocalIso, ignoreBookingId) {
+  const baseCheck = validateSlotForBooking(db, slotStartLocalIso, {
+    enforceFuture: true,
+    enforceLeadTime: true,
+    enforceHorizon: true,
+  });
+  if (!baseCheck.ok) return baseCheck;
+
+  const occupied = db
+    .prepare(
+      `SELECT id, user_id AS userId
+       FROM bookings
+       WHERE status = 'active' AND slot_start_utc = ?
+       LIMIT 1`
+    )
+    .get(baseCheck.slotUtcIso);
+
+  if (occupied && occupied.id !== ignoreBookingId) {
+    return { ok: false, error: "Этот слот уже занят" };
+  }
+
+  if (occupied && occupied.userId !== userId) {
+    return { ok: false, error: "Этот слот уже занят" };
+  }
+
+  return baseCheck;
+}
+
 function checkSlotBookableForAdmin(db, slotStartLocalIso, ignoreBookingId = null) {
   const baseCheck = validateSlotForBooking(db, slotStartLocalIso, {
     enforceFuture: true,
@@ -317,6 +345,7 @@ module.exports = {
   toLocalHuman,
   getDaySlotsDetailed,
   checkSlotBookable,
+  checkSlotReschedulableForUser,
   checkSlotBookableForAdmin,
   formatBooking,
   getUpcomingBookingByUser,

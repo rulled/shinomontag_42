@@ -309,6 +309,17 @@ button {
   margin-top: 12px;
 }
 
+.booking-actions-inline {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.booking-actions-inline .btn-ghost {
+  margin-top: 0;
+  flex: 1;
+}
+
 .status-badge {
   display: inline-flex;
   align-items: center;
@@ -799,6 +810,10 @@ button {
   padding: 12px;
 }
 
+.modal-backdrop.raised {
+  padding-bottom: 84px;
+}
+
 .modal-card {
   width: 100%;
   max-width: 560px;
@@ -880,6 +895,15 @@ button {
   margin-top: 12px;
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
+}
+
+.modal-input {
+  font-size: 16px;
+  border-radius: 10px;
+  border: 1px solid var(--bg-button-active);
+  padding: 10px 12px;
+  background: var(--bg-input);
 }
 
 @media (min-width: 900px) {

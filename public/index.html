@@ -31,7 +31,10 @@
           <div class="status-badge"><span class="status-dot active"></span> <span id="active_status_text">ПОДТВЕРЖДЕНО</span></div>
           <div class="text-value" id="active-time">--</div>
           <div class="text-sub" id="active-details">--</div>
-          <button class="btn-ghost" id="cancel_booking_btn">Отменить запись</button>
+          <div class="booking-actions-inline">
+            <button class="btn-ghost" id="reschedule_booking_btn">Перенести</button>
+            <button class="btn-ghost" id="cancel_booking_btn">Отменить запись</button>
+          </div>
         </div>
       </div>
     </div>
@@ -142,7 +145,7 @@
   <section class="modal-backdrop hidden" id="reschedule_modal">
     <div class="modal-card">
       <div class="modal-head">
-        <h3>Перенос записи</h3>
+        <h3 id="reschedule_modal_title">Перенос записи</h3>
         <button id="reschedule_close_btn" class="modal-close-btn">×</button>
       </div>
 
@@ -160,6 +163,27 @@
 
       <div class="modal-actions">
         <button class="action-btn btn-reschedule" id="reschedule_submit_btn" disabled>Перенести</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="modal-backdrop hidden" id="reason_modal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="reason_modal_title">Комментарий</h3>
+        <button id="reason_close_btn" class="modal-close-btn">×</button>
+      </div>
+
+      <div class="modal-body">
+        <label class="setting-control">
+          <span class="setting-name" id="reason_modal_label">Причина (необязательно)</span>
+          <input id="reason_input" class="input-field modal-input" type="text" maxlength="200" />
+        </label>
+      </div>
+
+      <div class="modal-actions">
+        <button class="action-btn btn-cancel" id="reason_cancel_btn">Отмена</button>
+        <button class="action-btn btn-reschedule" id="reason_submit_btn">Подтвердить</button>
       </div>
     </div>
   </section>
