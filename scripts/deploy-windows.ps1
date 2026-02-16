@@ -74,7 +74,14 @@ function Set-EnvValue {
 
 function New-AppSecret {
   $bytes = New-Object byte[] 48
-  [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+  $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+  try {
+    $rng.GetBytes($bytes)
+  } finally {
+    if ($null -ne $rng) {
+      $rng.Dispose()
+    }
+  }
   return [Convert]::ToBase64String($bytes).Replace("=", "").Replace("/", "").Replace("+", "")
 }
 
