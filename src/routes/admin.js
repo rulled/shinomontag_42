@@ -129,6 +129,48 @@ function createAdminRouter(db) {
     return res.json({ bookings: rows.map((row) => formatBooking(row, settings.timezone)) });
   });
 
+  router.get("/bookings/summary", (req, res) => {
+    const month = String(req.query.month || "");
+    if (!/^\d{4}-\d{2}$/.test(month)) {
+      return res.status(400).json({ error: "month обязателен в формате YYYY-MM" });
+    }
+
+    const settings = getSettings(db);
+    const monthStartLocal = DateTime.fromFormat(month, "yyyy-MM", {
+      zone: settings.timezone,
+    }).startOf("month");
+
+    if (!monthStartLocal.isValid) {
+      return res.status(400).json({ error: "Некорректный месяц" });
+    }
+
+    const monthEndLocal = monthStartLocal.plus({ months: 1 });
+    const startUtc = monthStartLocal.toUTC().toISO({ suppressMilliseconds: true });
+    const endUtc = monthEndLocal.toUTC().toISO({ suppressMilliseconds: true });
+
+    const rows = db
+      .prepare(
+        `SELECT slot_start_utc AS slotStartUtc
+         FROM bookings
+         WHERE status = 'active' AND slot_start_utc >= ? AND slot_start_utc < ?`
+      )
+      .all(startUtc, endUtc);
+
+    const counts = new Map();
+    for (const row of rows) {
+      const localDate = DateTime.fromISO(row.slotStartUtc, { zone: "utc" })
+        .setZone(settings.timezone)
+        .toISODate();
+      counts.set(localDate, (counts.get(localDate) || 0) + 1);
+    }
+
+    const summary = [...counts.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, bookingCount]) => ({ date, bookingCount }));
+
+    return res.json({ month, summary });
+  });
+
   router.post("/blocked-slots", (req, res) => {
     const schema = z.object({
       slotStartLocalIso: z.string().min(1),

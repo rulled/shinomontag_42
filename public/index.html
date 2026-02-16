@@ -2,97 +2,179 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Запись на шиномонтаж</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Шиномонтаж</title>
   <link rel="stylesheet" href="/styles.css" />
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
-  <main class="container">
-    <header class="header">
-      <h1>Запись на шиномонтаж</h1>
-      <p id="userInfo">Авторизация...</p>
+  <div id="toast" class="toast"></div>
+
+  <header class="text-header">Шиномонтаж</header>
+
+  <div class="profile-bar">
+    <span class="profile-name" id="user_name">Авторизация...</span>
+    <div class="mode-switch" id="mode_switch" hidden>
+      <button id="mode_user_btn" class="mode-btn active">Клиент</button>
+      <button id="mode_admin_btn" class="mode-btn">Админ</button>
+    </div>
+  </div>
+
+  <main id="user_screen">
+    <div class="container">
+      <div class="card" id="booking-card">
+        <span class="text-label">Ваш статус</span>
+
+        <div id="no-booking-state">
+          <div class="text-value muted-value">Нет записи</div>
+          <div class="text-sub">Выберите свободный слот ниже</div>
+        </div>
+
+        <div id="active-booking-state" hidden>
+          <div class="status-badge"><span class="status-dot active"></span> ПОДТВЕРЖДЕНО</div>
+          <div class="text-value" id="active-time">--</div>
+          <div class="text-sub" id="active-details">--</div>
+          <button class="btn-ghost" id="cancel_booking_btn">Отменить запись</button>
+        </div>
+      </div>
+    </div>
+
+    <section id="booking_flow">
+      <div class="section-title">
+        <span class="text-label">Выберите дату</span>
+      </div>
+      <div class="container slim-bottom">
+        <div class="date-strip" id="date_strip"></div>
+        <label class="text-label small-top" for="user_custom_date">Другая дата</label>
+        <input id="user_custom_date" class="date-input" type="date" />
+      </div>
+
+      <div class="section-title">
+        <span class="text-label">Доступные слоты</span>
+      </div>
+      <div class="container">
+        <div class="slots-grid" id="slots_container"></div>
+      </div>
+
+      <div class="container fade-in" id="form_section" hidden>
+        <div class="card">
+          <span class="text-label">Детали записи</span>
+          <div class="text-value" id="selected_slot_display">--:--</div>
+
+          <div class="input-group">
+            <label class="text-label" for="input_name">Ваше имя</label>
+            <input type="text" class="input-field" id="input_name" maxlength="80" placeholder="Введите имя" />
+          </div>
+
+          <div class="input-group">
+            <label class="text-label" for="input_phone">Телефон</label>
+            <input type="tel" class="input-field" id="input_phone" maxlength="18" inputmode="numeric" autocomplete="tel" placeholder="+7 (900) 000-00-00" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <button class="btn-main" id="user_action_btn" disabled>
+      <span id="user_action_text">Выберите слот</span>
+      <span class="arrow">→</span>
+    </button>
+  </main>
+
+  <main id="admin_screen" hidden>
+    <header class="admin-header">
+      <span class="header-title" id="admin_header_title">Записи</span>
     </header>
 
-    <section class="card" id="alerts"></section>
-
-    <section class="card">
-      <h2>Моя запись</h2>
-      <div id="myBooking" class="muted">Загрузка...</div>
-      <button id="cancelBookingBtn" class="danger" hidden>Отменить запись</button>
-    </section>
-
-    <section class="card" id="bookSection">
-      <h2>Новая запись</h2>
-      <div class="grid two">
-        <label>
-          Дата
-          <input type="date" id="bookingDate" />
-        </label>
-        <label>
-          Имя
-          <input type="text" id="name" placeholder="Ваше имя" maxlength="80" />
-        </label>
-      </div>
-
-      <label>
-        Телефон
-        <input type="tel" id="phone" placeholder="+7..." maxlength="32" />
-      </label>
-
-      <div>
-        <h3>Свободные слоты</h3>
-        <div id="slots" class="slots"></div>
-      </div>
-
-      <button id="createBookingBtn" class="primary" disabled>Записаться</button>
-    </section>
-
-    <section class="card" id="adminSection" hidden>
-      <h2>Панель администратора</h2>
-
-      <div class="admin-block">
-        <h3>Настройки записи</h3>
-        <div class="grid two">
-          <label>
-            Часовой пояс
-            <input type="text" id="adminTimezone" />
-          </label>
-          <label>
-            Минимум часов до записи
-            <input type="number" id="adminMinHours" min="0" max="168" />
-          </label>
+    <section id="admin_view_calendar">
+      <div class="calendar-section">
+        <div class="calendar-header">
+          <button class="month-nav" id="admin_month_prev">‹</button>
+          <span class="month-title" id="admin_month_title">--</span>
+          <button class="month-nav" id="admin_month_next">›</button>
         </div>
-        <label>
-          Горизонт записи (дней, пусто = без лимита)
-          <input type="number" id="adminHorizonDays" min="1" max="3650" />
-        </label>
-        <button id="saveSettingsBtn" class="primary">Сохранить настройки</button>
+
+        <div class="calendar-grid" id="admin_calendar_grid"></div>
       </div>
 
-      <div class="admin-block">
-        <h3>Недельный график</h3>
-        <div id="scheduleRows"></div>
-        <button id="saveScheduleBtn" class="primary">Сохранить график</button>
+      <div class="bookings-header">
+        <span class="section-label" id="admin_bookings_label">Записи</span>
       </div>
 
-      <div class="admin-block">
-        <h3>Управление слотами дня</h3>
-        <label>
-          Дата
-          <input type="date" id="adminDate" />
-        </label>
-        <button id="refreshAdminDayBtn">Обновить день</button>
-        <div id="adminSlots" class="admin-slots"></div>
-      </div>
+      <div class="bookings-container" id="admin_bookings"></div>
 
-      <div class="admin-block">
-        <h3>Записи на выбранную дату</h3>
-        <button id="refreshAdminBookingsBtn">Обновить список записей</button>
-        <div id="adminBookings"></div>
+      <div class="bookings-header">
+        <span class="section-label">Слоты дня</span>
+      </div>
+      <div class="bookings-container" id="admin_day_slots"></div>
+    </section>
+
+    <section id="admin_view_settings" hidden>
+      <div class="container">
+        <div>
+          <span class="section-label">Редактор расписания</span>
+          <div class="schedule-list" id="admin_schedule_list"></div>
+          <button class="btn-save section-save-btn" id="admin_save_schedule_btn">Сохранить график</button>
+        </div>
+
+        <div>
+          <span class="section-label">Дополнительные настройки</span>
+          <div class="card settings-grid">
+            <label class="setting-control">
+              <span class="setting-name">Мин. время до записи (ч)</span>
+              <input id="admin_min_hours" type="number" min="0" max="168" />
+            </label>
+
+            <label class="setting-control">
+              <span class="setting-name">Горизонт бронирования (дней)</span>
+              <input id="admin_horizon_days" type="number" min="1" max="3650" placeholder="Пусто = без лимита" />
+            </label>
+
+            <label class="setting-control">
+              <span class="setting-name">Часовой пояс</span>
+              <input id="admin_timezone" type="text" placeholder="Asia/Krasnoyarsk" />
+            </label>
+          </div>
+          <button class="btn-save section-save-btn" id="admin_save_settings_btn">Сохранить настройки</button>
+        </div>
       </div>
     </section>
+
+    <nav class="nav-bar">
+      <button class="nav-item active" id="admin_nav_calendar">
+        <span class="nav-icon circle-icon"></span>
+        Записи
+      </button>
+      <button class="nav-item" id="admin_nav_settings">
+        <span class="nav-icon square-icon"></span>
+        Настройки
+      </button>
+    </nav>
   </main>
+
+  <section class="modal-backdrop hidden" id="reschedule_modal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3>Перенос записи</h3>
+        <button id="reschedule_close_btn" class="modal-close-btn">×</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="modal-sub" id="reschedule_booking_info">Запись #--</p>
+
+        <label class="setting-control">
+          <span class="setting-name">Новая дата</span>
+          <input id="reschedule_date" type="date" />
+        </label>
+
+        <span class="setting-name">Выберите слот</span>
+        <div class="modal-slots" id="reschedule_slots"></div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="action-btn btn-reschedule" id="reschedule_submit_btn" disabled>Перенести</button>
+      </div>
+    </div>
+  </section>
 
   <script src="/app.js"></script>
 </body>

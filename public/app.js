@@ -1,17 +1,7 @@
 (() => {
   const tg = window.Telegram?.WebApp;
 
-  const state = {
-    token: "",
-    user: null,
-    settings: null,
-    selectedSlotIso: "",
-    daySlots: [],
-    adminDaySlots: [],
-    adminBookings: [],
-  };
-
-  const dayNames = {
+  const dayNamesLong = {
     1: "Понедельник",
     2: "Вторник",
     3: "Среда",
@@ -21,6 +11,62 @@
     7: "Воскресенье",
   };
 
+  const dayNamesShort = {
+    1: "ПН",
+    2: "ВТ",
+    3: "СР",
+    4: "ЧТ",
+    5: "ПТ",
+    6: "СБ",
+    7: "ВС",
+  };
+
+  const monthNames = [
+    "Январь",
+    "Февраль",
+    "Март",
+    "Апрель",
+    "Май",
+    "Июнь",
+    "Июль",
+    "Август",
+    "Сентябрь",
+    "Октябрь",
+    "Ноябрь",
+    "Декабрь",
+  ];
+
+  const weekdayHeaders = ["ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ", "ВС"];
+
+  const state = {
+    token: "",
+    user: null,
+    settings: null,
+    uiMode: "user",
+    userView: {
+      selectedDate: "",
+      daySlots: [],
+      selectedSlot: null,
+      myBooking: null,
+    },
+    adminView: {
+      tab: "calendar",
+      monthIso: "",
+      selectedDate: "",
+      settingsLoaded: false,
+      schedule: [],
+      daySlots: [],
+      bookings: [],
+      monthSummary: {},
+      reschedule: {
+        booking: null,
+        date: "",
+        daySlots: [],
+        selectedSlot: null,
+      },
+    },
+  };
+
   const apiBaseFromQuery = new URLSearchParams(window.location.search).get("api") || "";
   if (apiBaseFromQuery) {
     localStorage.setItem("apiBase", apiBaseFromQuery);
@@ -28,44 +74,77 @@
   const API_BASE = localStorage.getItem("apiBase") || "";
 
   const els = {
-    userInfo: document.getElementById("userInfo"),
-    alerts: document.getElementById("alerts"),
+    toast: document.getElementById("toast"),
 
-    myBooking: document.getElementById("myBooking"),
-    cancelBookingBtn: document.getElementById("cancelBookingBtn"),
+    userName: document.getElementById("user_name"),
+    modeSwitch: document.getElementById("mode_switch"),
+    modeUserBtn: document.getElementById("mode_user_btn"),
+    modeAdminBtn: document.getElementById("mode_admin_btn"),
 
-    bookingDate: document.getElementById("bookingDate"),
-    name: document.getElementById("name"),
-    phone: document.getElementById("phone"),
-    slots: document.getElementById("slots"),
-    createBookingBtn: document.getElementById("createBookingBtn"),
+    userScreen: document.getElementById("user_screen"),
+    noBookingState: document.getElementById("no-booking-state"),
+    activeBookingState: document.getElementById("active-booking-state"),
+    activeTime: document.getElementById("active-time"),
+    activeDetails: document.getElementById("active-details"),
+    cancelBookingBtn: document.getElementById("cancel_booking_btn"),
 
-    adminSection: document.getElementById("adminSection"),
-    adminTimezone: document.getElementById("adminTimezone"),
-    adminMinHours: document.getElementById("adminMinHours"),
-    adminHorizonDays: document.getElementById("adminHorizonDays"),
-    saveSettingsBtn: document.getElementById("saveSettingsBtn"),
+    bookingFlow: document.getElementById("booking_flow"),
+    dateStrip: document.getElementById("date_strip"),
+    userCustomDate: document.getElementById("user_custom_date"),
+    slotsContainer: document.getElementById("slots_container"),
 
-    scheduleRows: document.getElementById("scheduleRows"),
-    saveScheduleBtn: document.getElementById("saveScheduleBtn"),
+    formSection: document.getElementById("form_section"),
+    selectedSlotDisplay: document.getElementById("selected_slot_display"),
+    inputName: document.getElementById("input_name"),
+    inputPhone: document.getElementById("input_phone"),
 
-    adminDate: document.getElementById("adminDate"),
-    refreshAdminDayBtn: document.getElementById("refreshAdminDayBtn"),
-    adminSlots: document.getElementById("adminSlots"),
+    userActionBtn: document.getElementById("user_action_btn"),
+    userActionText: document.getElementById("user_action_text"),
 
-    refreshAdminBookingsBtn: document.getElementById("refreshAdminBookingsBtn"),
-    adminBookings: document.getElementById("adminBookings"),
+    adminScreen: document.getElementById("admin_screen"),
+    adminHeaderTitle: document.getElementById("admin_header_title"),
+    adminSaveScheduleBtn: document.getElementById("admin_save_schedule_btn"),
+    adminSaveSettingsBtn: document.getElementById("admin_save_settings_btn"),
+
+    adminViewCalendar: document.getElementById("admin_view_calendar"),
+    adminViewSettings: document.getElementById("admin_view_settings"),
+
+    adminNavCalendar: document.getElementById("admin_nav_calendar"),
+    adminNavSettings: document.getElementById("admin_nav_settings"),
+
+    adminMonthTitle: document.getElementById("admin_month_title"),
+    adminMonthPrev: document.getElementById("admin_month_prev"),
+    adminMonthNext: document.getElementById("admin_month_next"),
+    adminCalendarGrid: document.getElementById("admin_calendar_grid"),
+
+    adminBookingsLabel: document.getElementById("admin_bookings_label"),
+    adminBookings: document.getElementById("admin_bookings"),
+    adminDaySlots: document.getElementById("admin_day_slots"),
+
+    adminScheduleList: document.getElementById("admin_schedule_list"),
+    adminMinHours: document.getElementById("admin_min_hours"),
+    adminHorizonDays: document.getElementById("admin_horizon_days"),
+    adminTimezone: document.getElementById("admin_timezone"),
+
+    rescheduleModal: document.getElementById("reschedule_modal"),
+    rescheduleCloseBtn: document.getElementById("reschedule_close_btn"),
+    rescheduleBookingInfo: document.getElementById("reschedule_booking_info"),
+    rescheduleDate: document.getElementById("reschedule_date"),
+    rescheduleSlots: document.getElementById("reschedule_slots"),
+    rescheduleSubmitBtn: document.getElementById("reschedule_submit_btn"),
   };
 
-  function showAlert(message, type = "success") {
-    els.alerts.className = `card show alert-${type}`;
-    els.alerts.textContent = message;
+  function pad2(value) {
+    return String(value).padStart(2, "0");
+  }
+
+  function showToast(message, type = "success") {
+    els.toast.textContent = message;
+    els.toast.style.borderColor = type === "error" ? "rgba(255,69,58,0.45)" : "#3a3a3c";
+    els.toast.classList.add("show");
     setTimeout(() => {
-      els.alerts.className = "card";
-      els.alerts.textContent = "";
-      els.alerts.style.display = "none";
-    }, 4000);
-    els.alerts.style.display = "block";
+      els.toast.classList.remove("show");
+    }, 3200);
   }
 
   async function api(path, options = {}) {
@@ -103,6 +182,130 @@
     return `${map.year}-${map.month}-${map.day}`;
   }
 
+  function parseDateIso(dateIso) {
+    const [year, month, day] = dateIso.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  }
+
+  function toDateIso(date) {
+    return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+  }
+
+  function addDays(dateIso, days) {
+    const date = parseDateIso(dateIso);
+    date.setDate(date.getDate() + days);
+    return toDateIso(date);
+  }
+
+  function addMonths(monthIso, delta) {
+    const date = parseDateIso(monthIso);
+    date.setMonth(date.getMonth() + delta);
+    date.setDate(1);
+    return toDateIso(date);
+  }
+
+  function monthIsoFromDate(dateIso) {
+    const date = parseDateIso(dateIso);
+    date.setDate(1);
+    return toDateIso(date);
+  }
+
+  function monthParamFromIso(monthIso) {
+    return monthIso.slice(0, 7);
+  }
+
+  function toDayMonthLabel(dateIso) {
+    const date = parseDateIso(dateIso);
+    const weekday = date.getDay();
+    const jsToIso = weekday === 0 ? 7 : weekday;
+    const dayName = dayNamesShort[jsToIso];
+    return {
+      weekday: dayName,
+      dayNum: String(date.getDate()),
+    };
+  }
+
+  function statusLabel(status) {
+    const labels = {
+      free: "Свободно",
+      booked: "Занято",
+      blocked: "Заблокировано",
+      closed: "Вне графика",
+      too_soon: "Слишком близко",
+      beyond_horizon: "За горизонтом",
+      past: "Прошло",
+    };
+    return labels[status] || status;
+  }
+
+  function normalizeRuPhoneDigits(raw) {
+    let digits = String(raw || "").replace(/\D/g, "");
+    if (!digits) return "";
+
+    if (digits.startsWith("8")) {
+      digits = `7${digits.slice(1)}`;
+    }
+
+    if (digits.startsWith("9") && digits.length <= 10) {
+      digits = `7${digits}`;
+    }
+
+    if (!digits.startsWith("7")) {
+      digits = `7${digits}`;
+    }
+
+    return digits.slice(0, 11);
+  }
+
+  function formatRuPhone(raw) {
+    const digits = normalizeRuPhoneDigits(raw);
+    if (!digits) return "";
+
+    const p1 = digits.slice(1, 4);
+    const p2 = digits.slice(4, 7);
+    const p3 = digits.slice(7, 9);
+    const p4 = digits.slice(9, 11);
+
+    let result = "+7";
+
+    if (p1.length) {
+      result += ` (${p1}`;
+      if (p1.length === 3) result += ")";
+    }
+
+    if (p2.length) result += ` ${p2}`;
+    if (p3.length) result += `-${p3}`;
+    if (p4.length) result += `-${p4}`;
+
+    return result;
+  }
+
+  function isValidRuPhone(raw) {
+    const digits = normalizeRuPhoneDigits(raw);
+    return digits.length === 11 && digits.startsWith("7");
+  }
+
+  function formatRuPhoneForApi(raw) {
+    if (!isValidRuPhone(raw)) return null;
+    return formatRuPhone(raw);
+  }
+
+  function handlePhoneInput() {
+    const formatted = formatRuPhone(els.inputPhone.value);
+    if (els.inputPhone.value !== formatted) {
+      els.inputPhone.value = formatted;
+    }
+    updateUserActionButton();
+  }
+
+  function isAdmin() {
+    return Boolean(state.user?.isAdmin);
+  }
+
+  function isBookingLockedForUser() {
+    return Boolean(state.userView.myBooking);
+  }
+
   async function authenticate() {
     const initData = tg?.initData;
 
@@ -119,9 +322,6 @@
     const devToken = localStorage.getItem("devToken");
     if (devToken) {
       state.token = devToken;
-      const me = await api("/api/me");
-      state.user = me.user;
-      state.settings = me.settings;
       return;
     }
 
@@ -131,198 +331,629 @@
   async function loadMe() {
     const data = await api("/api/me");
     state.settings = data.settings;
+    state.user = {
+      ...(state.user || {}),
+      ...data.user,
+    };
 
-    const fullName = [state.user.firstName, state.user.lastName].filter(Boolean).join(" ");
-    els.userInfo.textContent = `${fullName || "Пользователь"} (${state.user.isAdmin ? "администратор" : "клиент"})`;
+    const fullName = [state.user.firstName, state.user.lastName].filter(Boolean).join(" ") || "Пользователь";
+    els.userName.textContent = fullName;
 
-    if (!els.name.value) {
-      els.name.value = state.user.firstName || "";
+    if (!els.inputName.value) {
+      els.inputName.value = state.user.firstName || "";
     }
 
-    const today = dateInTimezone(state.settings.timezone);
-    els.bookingDate.value = today;
-    els.adminDate.value = today;
+    const todayIso = dateInTimezone(state.settings.timezone);
+    state.userView.selectedDate = todayIso;
+    state.adminView.selectedDate = todayIso;
+    state.adminView.monthIso = monthIsoFromDate(todayIso);
+    els.userCustomDate.value = todayIso;
+
+    if (isAdmin()) {
+      els.modeSwitch.hidden = false;
+    } else {
+      els.modeSwitch.hidden = true;
+    }
   }
 
-  function renderMyBooking(booking) {
+  function renderDateStrip() {
+    const todayIso = dateInTimezone(state.settings.timezone);
+    const horizon = state.settings.bookingHorizonDays;
+    const maxDays = horizon == null ? 14 : Math.max(1, Math.min(horizon + 1, 30));
+
+    const dates = [];
+    for (let i = 0; i < maxDays; i += 1) {
+      dates.push(addDays(todayIso, i));
+    }
+
+    if (!dates.includes(state.userView.selectedDate)) {
+      dates.push(state.userView.selectedDate);
+      dates.sort();
+    }
+
+    els.dateStrip.innerHTML = "";
+
+    dates.forEach((dateIso, index) => {
+      const pill = document.createElement("button");
+      const { weekday, dayNum } = toDayMonthLabel(dateIso);
+      const dayTitle = index === 0 ? "Сегодня" : weekday;
+      pill.className = `date-pill ${dateIso === state.userView.selectedDate ? "active" : "inactive"}`;
+      pill.innerHTML = `<div class="date-day">${dayTitle}</div><div class="date-num">${dayNum}</div>`;
+      pill.addEventListener("click", () => {
+        if (isBookingLockedForUser()) return;
+        state.userView.selectedDate = dateIso;
+        state.userView.selectedSlot = null;
+        els.userCustomDate.value = dateIso;
+        renderDateStrip();
+        loadUserSlots().catch(handleError);
+      });
+      els.dateStrip.appendChild(pill);
+    });
+  }
+
+  function renderSlots() {
+    els.slotsContainer.innerHTML = "";
+
+    state.userView.daySlots.forEach((slot) => {
+      const slotEl = document.createElement("button");
+      slotEl.className = `slot-item ${slot.status}`;
+      if (state.userView.selectedSlot?.localIso === slot.localIso) {
+        slotEl.classList.add("selected");
+      }
+
+      slotEl.title = statusLabel(slot.status);
+      slotEl.disabled = slot.status !== "free" || isBookingLockedForUser();
+      slotEl.innerHTML = `<span class="slot-time">${slot.localLabel}</span>`;
+
+      if (!slotEl.disabled) {
+        slotEl.addEventListener("click", () => {
+          state.userView.selectedSlot = slot;
+          els.selectedSlotDisplay.textContent = slot.localLabel;
+          els.formSection.hidden = false;
+          renderSlots();
+          updateUserActionButton();
+        });
+      }
+
+      els.slotsContainer.appendChild(slotEl);
+    });
+
+    if (!state.userView.daySlots.length) {
+      els.slotsContainer.innerHTML = `<div class="empty-state">На эту дату слоты недоступны</div>`;
+    }
+  }
+
+  function renderMyBooking() {
+    const booking = state.userView.myBooking;
+
     if (!booking) {
-      els.myBooking.textContent = "Активной записи нет.";
-      els.cancelBookingBtn.hidden = true;
+      els.noBookingState.hidden = false;
+      els.activeBookingState.hidden = true;
+      els.bookingFlow.classList.remove("hidden");
+      els.userActionBtn.classList.remove("hidden");
+      updateUserActionButton();
       return;
     }
 
-    els.myBooking.innerHTML = `
-      <strong>${booking.slotStartLabel}</strong><br/>
-      Имя: ${escapeHtml(booking.userName)}<br/>
-      Телефон: ${escapeHtml(booking.phone)}
-    `;
-    els.cancelBookingBtn.hidden = false;
+    els.noBookingState.hidden = true;
+    els.activeBookingState.hidden = false;
+    els.activeTime.textContent = booking.slotStartLabel;
+    els.activeDetails.textContent = `${booking.userName} • ${booking.phone}`;
+    els.bookingFlow.classList.add("hidden");
+    els.formSection.hidden = true;
+    els.userActionBtn.classList.add("hidden");
+    state.userView.selectedSlot = null;
+  }
+
+  function updateUserActionButton() {
+    if (isBookingLockedForUser()) {
+      els.userActionBtn.disabled = true;
+      els.userActionText.textContent = "Есть активная запись";
+      return;
+    }
+
+    const selected = state.userView.selectedSlot;
+    const name = els.inputName.value.trim();
+    const phone = els.inputPhone.value.trim();
+
+    if (!selected) {
+      els.userActionBtn.disabled = true;
+      els.userActionText.textContent = "Выберите слот";
+      return;
+    }
+
+    if (!name || !phone) {
+      els.userActionBtn.disabled = true;
+      els.userActionText.textContent = `Введите имя и телефон (${selected.localLabel})`;
+      return;
+    }
+
+    if (!isValidRuPhone(phone)) {
+      els.userActionBtn.disabled = true;
+      els.userActionText.textContent = "Введите телефон в формате +7 (900) 000-00-00";
+      return;
+    }
+
+    els.userActionBtn.disabled = false;
+    els.userActionText.textContent = `Записаться на ${selected.localLabel}`;
   }
 
   async function loadMyBooking() {
     const data = await api("/api/bookings/my");
-    renderMyBooking(data.booking);
-
-    const hasBooking = Boolean(data.booking);
-    els.createBookingBtn.disabled = hasBooking || !state.selectedSlotIso;
-    document.getElementById("bookSection").style.opacity = hasBooking ? "0.55" : "1";
+    state.userView.myBooking = data.booking;
+    renderMyBooking();
   }
 
-  function renderSlots() {
-    els.slots.innerHTML = "";
+  async function loadUserSlots() {
+    const dateIso = state.userView.selectedDate;
+    const data = await api(`/api/slots/day?date=${encodeURIComponent(dateIso)}`);
+    state.userView.daySlots = data.slots;
 
-    const visibleStatuses = new Set(["free", "booked", "blocked", "too_soon", "beyond_horizon", "closed"]);
-
-    state.daySlots
-      .filter((slot) => visibleStatuses.has(slot.status))
-      .forEach((slot) => {
-        const btn = document.createElement("button");
-        btn.className = `slot ${slot.status}`;
-        btn.textContent = slot.localLabel;
-        btn.disabled = slot.status !== "free";
-
-        if (slot.localIso === state.selectedSlotIso) {
-          btn.classList.add("selected");
-        }
-
-        btn.title = statusLabel(slot.status);
-
-        btn.addEventListener("click", () => {
-          state.selectedSlotIso = slot.localIso;
-          renderSlots();
-          els.createBookingBtn.disabled = false;
-        });
-
-        els.slots.appendChild(btn);
-      });
-
-    if (!els.slots.innerHTML) {
-      els.slots.textContent = "На эту дату слоты недоступны.";
+    if (
+      state.userView.selectedSlot &&
+      !state.userView.daySlots.some(
+        (slot) =>
+          slot.localIso === state.userView.selectedSlot.localIso &&
+          slot.status === "free"
+      )
+    ) {
+      state.userView.selectedSlot = null;
+      els.formSection.hidden = true;
+      els.selectedSlotDisplay.textContent = "--:--";
     }
-  }
 
-  async function loadSlots() {
-    const date = els.bookingDate.value;
-    if (!date) return;
-
-    const data = await api(`/api/slots/day?date=${encodeURIComponent(date)}`);
-    state.daySlots = data.slots;
-    state.selectedSlotIso = "";
     renderSlots();
-    els.createBookingBtn.disabled = true;
+    updateUserActionButton();
   }
 
   async function createBooking() {
-    if (!state.selectedSlotIso) {
-      showAlert("Выберите слот", "error");
+    if (isBookingLockedForUser()) {
+      showToast("У вас уже есть активная запись", "error");
       return;
     }
 
-    const name = els.name.value.trim();
-    const phone = els.phone.value.trim();
+    const selected = state.userView.selectedSlot;
+    if (!selected) {
+      showToast("Выберите слот", "error");
+      return;
+    }
 
-    if (!name || !phone) {
-      showAlert("Введите имя и телефон", "error");
+    const name = els.inputName.value.trim();
+    const phoneRaw = els.inputPhone.value.trim();
+    const phone = formatRuPhoneForApi(phoneRaw);
+
+    if (!name || !phoneRaw) {
+      showToast("Введите имя и телефон", "error");
+      return;
+    }
+
+    if (!phone) {
+      showToast("Телефон должен быть в формате +7 (900) 000-00-00", "error");
       return;
     }
 
     await api("/api/bookings", {
       method: "POST",
       body: JSON.stringify({
-        slotStartLocalIso: state.selectedSlotIso,
+        slotStartLocalIso: selected.localIso,
         name,
         phone,
       }),
     });
 
-    showAlert("Запись успешно создана");
-    await Promise.all([loadMyBooking(), loadSlots()]);
+    showToast("Запись успешно создана");
+    await Promise.all([loadMyBooking(), loadUserSlots()]);
   }
 
   async function cancelBooking() {
+    if (!state.userView.myBooking) return;
+
+    const confirmed = window.confirm("Отменить текущую запись?");
+    if (!confirmed) return;
+
     await api("/api/bookings/my", { method: "DELETE" });
-    showAlert("Запись отменена");
-    await Promise.all([loadMyBooking(), loadSlots()]);
+    showToast("Запись отменена");
+    await Promise.all([loadMyBooking(), loadUserSlots()]);
   }
 
-  function statusLabel(status) {
-    const labels = {
-      free: "Свободно",
-      booked: "Занято",
-      blocked: "Заблокировано",
-      closed: "Вне графика",
-      too_soon: "Слишком близко",
-      beyond_horizon: "За горизонтом записи",
-      past: "Прошло",
-    };
-    return labels[status] || status;
+  function setUiMode(mode) {
+    if (mode === "admin" && !isAdmin()) return;
+
+    state.uiMode = mode;
+    const isUser = mode === "user";
+
+    els.userScreen.hidden = !isUser;
+    els.adminScreen.hidden = isUser;
+
+    els.modeUserBtn.classList.toggle("active", isUser);
+    els.modeAdminBtn.classList.toggle("active", !isUser);
+
+    if (!isUser) {
+      renderAdminTab();
+    }
   }
 
-  function escapeHtml(value) {
-    return String(value)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
+  function buildTimeOptions(selected) {
+    const options = [];
+    for (let h = 0; h <= 23; h += 1) {
+      const hh = pad2(h);
+      const value = `${hh}:00`;
+      options.push(`<option value="${value}" ${value === selected ? "selected" : ""}>${value}</option>`);
+    }
+    options.push(`<option value="24:00" ${selected === "24:00" ? "selected" : ""}>24:00</option>`);
+    return options.join("");
   }
 
-  async function loadAdmin() {
-    if (!state.user.isAdmin) return;
+  function renderAdminSchedule() {
+    els.adminScheduleList.innerHTML = "";
 
-    els.adminSection.hidden = false;
+    state.adminView.schedule
+      .slice()
+      .sort((a, b) => a.dayOfWeek - b.dayOfWeek)
+      .forEach((day) => {
+        const row = document.createElement("div");
+        row.className = `day-row ${day.isWorking ? "" : "off"}`;
+        row.dataset.day = String(day.dayOfWeek);
 
+        row.innerHTML = `
+          <span class="day-name">${dayNamesShort[day.dayOfWeek]}</span>
+          <div class="day-controls">
+            <input class="day-toggle" type="checkbox" ${day.isWorking ? "checked" : ""} />
+            <select class="time-select day-start">${buildTimeOptions(day.startTime)}</select>
+            <select class="time-select day-end">${buildTimeOptions(day.endTime)}</select>
+          </div>
+        `;
+
+        const checkbox = row.querySelector(".day-toggle");
+        const startSelect = row.querySelector(".day-start");
+        const endSelect = row.querySelector(".day-end");
+
+        function syncRowState() {
+          row.classList.toggle("off", !checkbox.checked);
+          startSelect.disabled = !checkbox.checked;
+          endSelect.disabled = !checkbox.checked;
+        }
+
+        checkbox.addEventListener("change", syncRowState);
+        syncRowState();
+
+        els.adminScheduleList.appendChild(row);
+      });
+  }
+
+  function collectAdminSchedule() {
+    const rows = [...els.adminScheduleList.querySelectorAll(".day-row")];
+    return rows.map((row) => ({
+      dayOfWeek: Number(row.dataset.day),
+      isWorking: row.querySelector(".day-toggle").checked,
+      startTime: row.querySelector(".day-start").value,
+      endTime: row.querySelector(".day-end").value,
+    }));
+  }
+
+  async function loadAdminSettings() {
     const data = await api("/api/admin/settings");
-    state.settings = data.settings;
 
-    els.adminTimezone.value = data.settings.timezone;
-    els.adminMinHours.value = String(data.settings.minHoursBeforeBooking);
+    state.settings = data.settings;
+    state.adminView.schedule = data.schedule;
+    state.adminView.settingsLoaded = true;
+
+    els.adminTimezone.value = data.settings.timezone || "";
+    els.adminMinHours.value = String(data.settings.minHoursBeforeBooking ?? 2);
     els.adminHorizonDays.value = data.settings.bookingHorizonDays == null ? "" : String(data.settings.bookingHorizonDays);
 
-    renderSchedule(data.schedule);
-    await Promise.all([loadAdminDay(), loadAdminBookings()]);
+    renderAdminSchedule();
+    renderDateStrip();
   }
 
-  function renderSchedule(schedule) {
-    els.scheduleRows.innerHTML = "";
+  async function loadAdminMonthSummary() {
+    const month = monthParamFromIso(state.adminView.monthIso);
+    const data = await api(`/api/admin/bookings/summary?month=${encodeURIComponent(month)}`);
+    state.adminView.monthSummary = {};
+    for (const item of data.summary) {
+      state.adminView.monthSummary[item.date] = item.bookingCount;
+    }
+  }
 
-    schedule.forEach((day) => {
-      const row = document.createElement("div");
-      row.className = "schedule-row";
-      row.dataset.day = String(day.dayOfWeek);
+  function renderAdminCalendar() {
+    const selectedDate = state.adminView.selectedDate;
+    const monthIso = state.adminView.monthIso;
+    const monthDate = parseDateIso(monthIso);
 
-      row.innerHTML = `
-        <strong>${dayNames[day.dayOfWeek]}</strong>
-        <label><input type="checkbox" class="work" ${day.isWorking ? "checked" : ""}/> Рабочий</label>
-        <select class="start">${buildTimeOptions(day.startTime, true)}</select>
-        <select class="end">${buildTimeOptions(day.endTime, true)}</select>
+    els.adminMonthTitle.textContent = `${monthNames[monthDate.getMonth()]} ${monthDate.getFullYear()}`;
+    els.adminCalendarGrid.innerHTML = "";
+
+    weekdayHeaders.forEach((wd) => {
+      const cell = document.createElement("div");
+      cell.className = "weekday-label";
+      cell.textContent = wd;
+      els.adminCalendarGrid.appendChild(cell);
+    });
+
+    const firstDayWeekJs = monthDate.getDay();
+    const firstDayOffset = (firstDayWeekJs + 6) % 7;
+    const daysInMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0).getDate();
+
+    for (let i = 0; i < firstDayOffset; i += 1) {
+      const empty = document.createElement("div");
+      empty.className = "calendar-day empty";
+      empty.textContent = ".";
+      els.adminCalendarGrid.appendChild(empty);
+    }
+
+    const todayIso = dateInTimezone(state.settings.timezone);
+
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const dateIso = `${monthDate.getFullYear()}-${pad2(monthDate.getMonth() + 1)}-${pad2(day)}`;
+      const btn = document.createElement("button");
+      btn.className = "calendar-day";
+      const count = state.adminView.monthSummary[dateIso] || 0;
+      btn.innerHTML = `<span>${day}</span>${count > 0 ? `<span class="calendar-count">${count > 9 ? "9+" : count}</span>` : ""}`;
+
+      if (dateIso === selectedDate) {
+        btn.classList.add("active");
+      }
+
+      if (dateIso === todayIso) {
+        btn.classList.add("today");
+      }
+
+      btn.addEventListener("click", () => {
+        state.adminView.selectedDate = dateIso;
+        renderAdminCalendar();
+        loadAdminDateData().catch(handleError);
+      });
+
+      els.adminCalendarGrid.appendChild(btn);
+    }
+  }
+
+  function renderAdminBookings() {
+    const date = parseDateIso(state.adminView.selectedDate);
+    const label = `${date.getDate()} ${monthNames[date.getMonth()].toLowerCase()}`;
+    els.adminBookingsLabel.textContent = `Записи на ${label}`;
+
+    els.adminBookings.innerHTML = "";
+
+    if (!state.adminView.bookings.length) {
+      els.adminBookings.innerHTML = `<div class="empty-state">На этот день записей нет</div>`;
+      return;
+    }
+
+    state.adminView.bookings.forEach((booking) => {
+      const card = document.createElement("div");
+      card.className = "booking-card";
+      card.innerHTML = `
+        <div class="booking-header">
+          <span class="booking-time">${booking.slotStartLabel.slice(-5)}</span>
+          <span class="booking-secondary">#${booking.id}</span>
+        </div>
+        <div class="booking-user-info">
+          <span class="user-name">${escapeHtml(booking.userName)}</span>
+          <span class="user-phone">${escapeHtml(booking.phone)}</span>
+        </div>
+        <div class="booking-actions">
+          <button class="action-btn btn-reschedule">Перенести</button>
+          <button class="action-btn btn-cancel">Отменить</button>
+        </div>
       `;
 
-      els.scheduleRows.appendChild(row);
+      const [rescheduleBtn, cancelBtn] = card.querySelectorAll("button");
+
+      rescheduleBtn.addEventListener("click", async () => {
+        await openRescheduleModal(booking);
+      });
+
+      cancelBtn.addEventListener("click", async () => {
+        const reason = window.prompt("Причина отмены (необязательно)", "") || "";
+        await api(`/api/admin/bookings/${booking.id}/cancel`, {
+          method: "POST",
+          body: JSON.stringify({ reason }),
+        });
+
+        showToast("Запись отменена");
+        await Promise.all([
+          loadAdminDateData({ includeSummary: true }),
+          loadMyBooking(),
+          loadUserSlots(),
+        ]);
+      });
+
+      els.adminBookings.appendChild(card);
     });
   }
 
-  function buildTimeOptions(selected, include24 = false) {
-    const options = [];
-    for (let h = 0; h <= 23; h += 1) {
-      const hh = String(h).padStart(2, "0");
-      options.push(`${hh}:00`);
-    }
-    if (include24) options.push("24:00");
+  function renderAdminDaySlots() {
+    els.adminDaySlots.innerHTML = "";
 
-    return options
-      .map((value) => `<option value="${value}" ${value === selected ? "selected" : ""}>${value}</option>`)
-      .join("");
+    const visibleSlots = state.adminView.daySlots.filter((slot) => ["free", "blocked", "booked"].includes(slot.status));
+
+    if (!visibleSlots.length) {
+      els.adminDaySlots.innerHTML = `<div class="empty-state">Нет управляемых слотов на дату</div>`;
+      return;
+    }
+
+    visibleSlots.forEach((slot) => {
+      const card = document.createElement("div");
+      card.className = "slot-card";
+
+      const statusText = statusLabel(slot.status);
+      let detailsText = statusText;
+
+      if (slot.status === "booked" && slot.details) {
+        detailsText = `${statusText}: ${slot.details.userName}, ${slot.details.phone}`;
+      }
+
+      if (slot.status === "blocked" && slot.details?.reason) {
+        detailsText = `${statusText}: ${slot.details.reason}`;
+      }
+
+      card.innerHTML = `
+        <div class="slot-meta">
+          <span class="slot-primary">${slot.localLabel}</span>
+          <span class="slot-secondary">${escapeHtml(detailsText)}</span>
+        </div>
+      `;
+
+      if (slot.status === "free") {
+        const blockBtn = document.createElement("button");
+        blockBtn.className = "slot-action";
+        blockBtn.textContent = "Блок";
+        blockBtn.addEventListener("click", async () => {
+          const reason = window.prompt("Причина блокировки (необязательно)", "") || "";
+          await api("/api/admin/blocked-slots", {
+            method: "POST",
+            body: JSON.stringify({ slotStartLocalIso: slot.localIso, reason }),
+          });
+          showToast("Слот заблокирован");
+          await loadAdminDateData();
+        });
+        card.appendChild(blockBtn);
+      }
+
+      if (slot.status === "blocked" && slot.details?.id) {
+        const unblockBtn = document.createElement("button");
+        unblockBtn.className = "slot-action danger";
+        unblockBtn.textContent = "Разблокировать";
+        unblockBtn.addEventListener("click", async () => {
+          await api(`/api/admin/blocked-slots/${slot.details.id}`, {
+            method: "DELETE",
+          });
+          showToast("Слот разблокирован");
+          await loadAdminDateData();
+        });
+        card.appendChild(unblockBtn);
+      }
+
+      els.adminDaySlots.appendChild(card);
+    });
   }
 
-  function collectSchedule() {
-    const rows = [...els.scheduleRows.querySelectorAll(".schedule-row")];
-    return rows.map((row) => ({
-      dayOfWeek: Number(row.dataset.day),
-      isWorking: row.querySelector(".work").checked,
-      startTime: row.querySelector(".start").value,
-      endTime: row.querySelector(".end").value,
-    }));
+  function closeRescheduleModal() {
+    state.adminView.reschedule.booking = null;
+    state.adminView.reschedule.date = "";
+    state.adminView.reschedule.daySlots = [];
+    state.adminView.reschedule.selectedSlot = null;
+    els.rescheduleModal.classList.add("hidden");
+    els.rescheduleSlots.innerHTML = "";
+    els.rescheduleSubmitBtn.disabled = true;
+  }
+
+  function renderRescheduleSlots() {
+    const current = state.adminView.reschedule;
+    els.rescheduleSlots.innerHTML = "";
+
+    const options = current.daySlots.filter((slot) => {
+      if (slot.status === "free") return true;
+      return slot.status === "booked" && slot.details?.id === current.booking?.id;
+    });
+
+    if (!options.length) {
+      els.rescheduleSlots.innerHTML = `<div class="empty-state">Нет доступных слотов на выбранную дату</div>`;
+      els.rescheduleSubmitBtn.disabled = true;
+      return;
+    }
+
+    options.forEach((slot) => {
+      const isCurrentBookingSlot = slot.status === "booked" && slot.details?.id === current.booking?.id;
+      const isSelected = current.selectedSlot?.localIso === slot.localIso;
+      const btn = document.createElement("button");
+      btn.className = `modal-slot ${isCurrentBookingSlot ? "free" : slot.status} ${isSelected ? "selected" : ""}`;
+      btn.textContent = isCurrentBookingSlot ? `${slot.localLabel} (текущий)` : slot.localLabel;
+      btn.addEventListener("click", () => {
+        current.selectedSlot = slot;
+        renderRescheduleSlots();
+      });
+      els.rescheduleSlots.appendChild(btn);
+    });
+
+    els.rescheduleSubmitBtn.disabled = !current.selectedSlot;
+  }
+
+  async function loadRescheduleDaySlots() {
+    const current = state.adminView.reschedule;
+    if (!current.date) return;
+    const data = await api(`/api/admin/day?date=${encodeURIComponent(current.date)}`);
+    current.daySlots = data.slots;
+    if (
+      current.selectedSlot &&
+      !current.daySlots.some((slot) => slot.localIso === current.selectedSlot.localIso)
+    ) {
+      current.selectedSlot = null;
+    }
+    renderRescheduleSlots();
+  }
+
+  async function openRescheduleModal(booking) {
+    state.adminView.reschedule.booking = booking;
+    state.adminView.reschedule.date = booking.slotStartLocalIso.slice(0, 10);
+    state.adminView.reschedule.daySlots = [];
+    state.adminView.reschedule.selectedSlot = null;
+
+    els.rescheduleBookingInfo.textContent = `Запись #${booking.id}: ${booking.userName}, ${booking.phone}`;
+    els.rescheduleDate.value = state.adminView.reschedule.date;
+    els.rescheduleModal.classList.remove("hidden");
+    els.rescheduleSlots.innerHTML = `<div class="empty-state">Загрузка слотов...</div>`;
+    els.rescheduleSubmitBtn.disabled = true;
+
+    await loadRescheduleDaySlots();
+  }
+
+  async function submitRescheduleModal() {
+    const current = state.adminView.reschedule;
+    if (!current.booking || !current.selectedSlot) {
+      showToast("Выберите новый слот", "error");
+      return;
+    }
+
+    await api(`/api/admin/bookings/${current.booking.id}/reschedule`, {
+      method: "POST",
+      body: JSON.stringify({ newSlotStartLocalIso: current.selectedSlot.localIso }),
+    });
+
+    closeRescheduleModal();
+    showToast("Запись перенесена");
+    await Promise.all([
+      loadAdminDateData({ includeSummary: true }),
+      loadMyBooking(),
+      loadUserSlots(),
+    ]);
+  }
+
+  async function loadAdminDateData({ includeSummary = false } = {}) {
+    const date = state.adminView.selectedDate;
+    const jobs = [
+      api(`/api/admin/bookings?date=${encodeURIComponent(date)}`),
+      api(`/api/admin/day?date=${encodeURIComponent(date)}`),
+    ];
+
+    if (includeSummary) {
+      jobs.push(loadAdminMonthSummary());
+    }
+
+    const [bookingsData, dayData] = await Promise.all(jobs);
+
+    state.adminView.bookings = bookingsData.bookings.filter((b) => b.status === "active");
+    state.adminView.daySlots = dayData.slots;
+
+    if (includeSummary) {
+      renderAdminCalendar();
+    }
+
+    renderAdminBookings();
+    renderAdminDaySlots();
+  }
+
+  function renderAdminTab() {
+    const tab = state.adminView.tab;
+    const isSettings = tab === "settings";
+
+    els.adminViewCalendar.hidden = isSettings;
+    els.adminViewSettings.hidden = !isSettings;
+    els.adminHeaderTitle.textContent = isSettings ? "Настройки" : "Записи";
+
+    els.adminNavCalendar.classList.toggle("active", !isSettings);
+    els.adminNavSettings.classList.toggle("active", isSettings);
   }
 
   async function saveAdminSettings() {
@@ -339,143 +970,44 @@
       }),
     });
 
-    showAlert("Настройки сохранены");
+    showToast("Настройки сохранены");
+    await Promise.all([loadMe(), loadUserSlots(), loadAdminSettings(), loadAdminDateData({ includeSummary: true })]);
   }
 
-  async function saveSchedule() {
-    const days = collectSchedule();
-
+  async function saveAdminSchedule() {
     await api("/api/admin/schedule", {
       method: "PUT",
-      body: JSON.stringify({ days }),
+      body: JSON.stringify({
+        days: collectAdminSchedule(),
+      }),
     });
 
-    showAlert("График сохранен");
-    await Promise.all([loadSlots(), loadAdminDay()]);
+    showToast("График сохранен");
+    await Promise.all([loadAdminSettings(), loadAdminDateData()]);
   }
 
-  function renderAdminDaySlots() {
-    els.adminSlots.innerHTML = "";
-
-    state.adminDaySlots.forEach((slot) => {
-      const card = document.createElement("div");
-      card.className = "admin-slot-card";
-
-      const meta = [statusLabel(slot.status)];
-      if (slot.status === "booked" && slot.details) {
-        meta.push(`${slot.details.userName}, ${slot.details.phone}`);
-      }
-      if (slot.status === "blocked" && slot.details?.reason) {
-        meta.push(slot.details.reason);
-      }
-
-      card.innerHTML = `<p><strong>${slot.localLabel}</strong><br/>${meta.join(" | ")}</p>`;
-
-      if (slot.status === "free") {
-        const blockBtn = document.createElement("button");
-        blockBtn.textContent = "Заблокировать";
-        blockBtn.addEventListener("click", async () => {
-          const reason = window.prompt("Причина блокировки (необязательно):", "") || "";
-          await api("/api/admin/blocked-slots", {
-            method: "POST",
-            body: JSON.stringify({ slotStartLocalIso: slot.localIso, reason }),
-          });
-          showAlert("Слот заблокирован");
-          await loadAdminDay();
-        });
-        card.appendChild(blockBtn);
-      }
-
-      if (slot.status === "blocked" && slot.details?.id) {
-        const unblockBtn = document.createElement("button");
-        unblockBtn.textContent = "Разблокировать";
-        unblockBtn.addEventListener("click", async () => {
-          await api(`/api/admin/blocked-slots/${slot.details.id}`, { method: "DELETE" });
-          showAlert("Слот разблокирован");
-          await loadAdminDay();
-        });
-        card.appendChild(unblockBtn);
-      }
-
-      els.adminSlots.appendChild(card);
-    });
-  }
-
-  async function loadAdminDay() {
-    const date = els.adminDate.value;
-    if (!date) return;
-
-    const data = await api(`/api/admin/day?date=${encodeURIComponent(date)}`);
-    state.adminDaySlots = data.slots;
-    renderAdminDaySlots();
-  }
-
-  function renderAdminBookings() {
-    els.adminBookings.innerHTML = "";
-
-    if (!state.adminBookings.length) {
-      els.adminBookings.textContent = "Записей на эту дату нет.";
-      return;
-    }
-
-    state.adminBookings.forEach((booking) => {
-      const row = document.createElement("div");
-      row.className = "booking-row";
-
-      row.innerHTML = `
-        <strong>${booking.slotStartLabel}</strong>
-        <span>${escapeHtml(booking.userName)}</span>
-        <span>${escapeHtml(booking.phone)}</span>
-      `;
-
-      const cancelBtn = document.createElement("button");
-      cancelBtn.textContent = "Отменить";
-      cancelBtn.className = "danger";
-      cancelBtn.addEventListener("click", async () => {
-        const reason = window.prompt("Причина отмены (необязательно)", "") || "";
-        await api(`/api/admin/bookings/${booking.id}/cancel`, {
-          method: "POST",
-          body: JSON.stringify({ reason }),
-        });
-        showAlert("Запись отменена");
-        await Promise.all([loadAdminBookings(), loadAdminDay(), loadSlots(), loadMyBooking()]);
-      });
-
-      const rescheduleBtn = document.createElement("button");
-      rescheduleBtn.textContent = "Перенести";
-      rescheduleBtn.addEventListener("click", async () => {
-        const next = window.prompt("Новый слот (формат YYYY-MM-DDTHH:00)", booking.slotStartLocalIso);
-        if (!next) return;
-
-        await api(`/api/admin/bookings/${booking.id}/reschedule`, {
-          method: "POST",
-          body: JSON.stringify({ newSlotStartLocalIso: next }),
-        });
-        showAlert("Запись перенесена");
-        await Promise.all([loadAdminBookings(), loadAdminDay(), loadSlots(), loadMyBooking()]);
-      });
-
-      row.appendChild(cancelBtn);
-      row.appendChild(rescheduleBtn);
-      els.adminBookings.appendChild(row);
-    });
-  }
-
-  async function loadAdminBookings() {
-    const date = els.adminDate.value;
-    if (!date) return;
-
-    const data = await api(`/api/admin/bookings?date=${encodeURIComponent(date)}`);
-    state.adminBookings = data.bookings.filter((x) => x.status === "active");
-    renderAdminBookings();
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
   }
 
   function bindEvents() {
-    els.bookingDate.addEventListener("change", () => {
-      loadSlots().catch(handleError);
+    els.userCustomDate.addEventListener("change", () => {
+      if (!els.userCustomDate.value) return;
+      state.userView.selectedDate = els.userCustomDate.value;
+      state.userView.selectedSlot = null;
+      renderDateStrip();
+      loadUserSlots().catch(handleError);
     });
 
-    els.createBookingBtn.addEventListener("click", () => {
+    els.inputName.addEventListener("input", updateUserActionButton);
+    els.inputPhone.addEventListener("input", handlePhoneInput);
+
+    els.userActionBtn.addEventListener("click", () => {
       createBooking().catch(handleError);
     });
 
@@ -483,31 +1015,79 @@
       cancelBooking().catch(handleError);
     });
 
-    els.saveSettingsBtn.addEventListener("click", () => {
+    els.modeUserBtn.addEventListener("click", () => {
+      setUiMode("user");
+    });
+
+    els.modeAdminBtn.addEventListener("click", async () => {
+      setUiMode("admin");
+
+      if (!state.adminView.settingsLoaded) {
+        await loadAdminSettings();
+      }
+      await loadAdminMonthSummary();
+      renderAdminCalendar();
+      await loadAdminDateData();
+    });
+
+    els.adminNavCalendar.addEventListener("click", () => {
+      state.adminView.tab = "calendar";
+      renderAdminTab();
+    });
+
+    els.adminNavSettings.addEventListener("click", async () => {
+      state.adminView.tab = "settings";
+      renderAdminTab();
+      if (!state.adminView.settingsLoaded) {
+        await loadAdminSettings();
+      }
+    });
+
+    els.adminMonthPrev.addEventListener("click", () => {
+      state.adminView.monthIso = addMonths(state.adminView.monthIso, -1);
+      const monthDate = parseDateIso(state.adminView.monthIso);
+      state.adminView.selectedDate = `${monthDate.getFullYear()}-${pad2(monthDate.getMonth() + 1)}-01`;
+      Promise.all([loadAdminMonthSummary(), loadAdminDateData()])
+        .then(() => renderAdminCalendar())
+        .catch(handleError);
+    });
+
+    els.adminMonthNext.addEventListener("click", () => {
+      state.adminView.monthIso = addMonths(state.adminView.monthIso, 1);
+      const monthDate = parseDateIso(state.adminView.monthIso);
+      state.adminView.selectedDate = `${monthDate.getFullYear()}-${pad2(monthDate.getMonth() + 1)}-01`;
+      Promise.all([loadAdminMonthSummary(), loadAdminDateData()])
+        .then(() => renderAdminCalendar())
+        .catch(handleError);
+    });
+
+    els.adminSaveSettingsBtn.addEventListener("click", () => {
       saveAdminSettings().catch(handleError);
     });
 
-    els.saveScheduleBtn.addEventListener("click", () => {
-      saveSchedule().catch(handleError);
+    els.adminSaveScheduleBtn.addEventListener("click", () => {
+      saveAdminSchedule().catch(handleError);
     });
 
-    els.refreshAdminDayBtn.addEventListener("click", () => {
-      loadAdminDay().catch(handleError);
+    els.rescheduleCloseBtn.addEventListener("click", closeRescheduleModal);
+    els.rescheduleModal.addEventListener("click", (event) => {
+      if (event.target === els.rescheduleModal) {
+        closeRescheduleModal();
+      }
     });
-
-    els.refreshAdminBookingsBtn.addEventListener("click", () => {
-      loadAdminBookings().catch(handleError);
+    els.rescheduleDate.addEventListener("change", () => {
+      state.adminView.reschedule.date = els.rescheduleDate.value;
+      state.adminView.reschedule.selectedSlot = null;
+      loadRescheduleDaySlots().catch(handleError);
     });
-
-    els.adminDate.addEventListener("change", () => {
-      Promise.all([loadAdminDay(), loadAdminBookings()]).catch(handleError);
+    els.rescheduleSubmitBtn.addEventListener("click", () => {
+      submitRescheduleModal().catch(handleError);
     });
   }
 
   function handleError(error) {
-    const message = error?.message || "Неизвестная ошибка";
-    showAlert(message, "error");
     console.error(error);
+    showToast(error?.message || "Неизвестная ошибка", "error");
   }
 
   async function bootstrap() {
@@ -520,10 +1100,15 @@
 
     await authenticate();
     await loadMe();
-    await Promise.all([loadMyBooking(), loadSlots()]);
 
-    if (state.user.isAdmin) {
-      await loadAdmin();
+    renderDateStrip();
+    await Promise.all([loadMyBooking(), loadUserSlots()]);
+
+    if (isAdmin()) {
+      await loadAdminSettings();
+      await loadAdminMonthSummary();
+      renderAdminCalendar();
+      await loadAdminDateData();
     }
   }
 
