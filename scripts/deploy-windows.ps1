@@ -7,7 +7,8 @@ param(
   [string]$ApiDomain,
   [string]$AppServiceName = "botfather-app",
   [string]$CaddyServiceName = "botfather-caddy",
-  [switch]$SkipSourceSync
+  [switch]$SkipSourceSync,
+  [switch]$SkipServices
 )
 
 $ErrorActionPreference = "Stop"
@@ -147,7 +148,9 @@ function Wait-ForHealth {
   return $false
 }
 
-Assert-Admin
+if (-not $SkipServices) {
+  Assert-Admin
+}
 
 Write-Step "Checking required binaries"
 if (-not (Test-Path $CaddyExe)) {
@@ -262,6 +265,14 @@ $runCmdContent = @(
 )
 Set-Content -Path $runCmdPath -Value $runCmdContent -Encoding ascii
 
+$runCaddyCmdPath = Join-Path $TargetDir "run-caddy.cmd"
+$runCaddyCmdContent = @(
+  "@echo off",
+  "cd /d $TargetDir",
+  "`"$CaddyExe`" run --config `"$CaddyConfigPath`" --adapter caddyfile >> `"$logsDir\caddy.out.log`" 2>> `"$logsDir\caddy.err.log`""
+)
+Set-Content -Path $runCaddyCmdPath -Value $runCaddyCmdContent -Encoding ascii
+
 Write-Step "Generating Caddyfile: $CaddyConfigPath"
 $caddyDir = Split-Path -Path $CaddyConfigPath -Parent
 if (-not (Test-Path $caddyDir)) {
@@ -275,23 +286,38 @@ $AppDomain, $ApiDomain {
 "@
 Set-Content -Path $CaddyConfigPath -Value $caddyfile -Encoding ascii
 
-Write-Step "Configuring Windows services"
-$appBin = "`"$env:ComSpec`" /c `"$runCmdPath`""
-$caddyBin = "`"$CaddyExe`" run --config `"$CaddyConfigPath`" --adapter caddyfile"
+if (-not $SkipServices) {
+  Write-Step "Configuring Windows services"
+  $appBin = "`"$env:ComSpec`" /c `"$runCmdPath`""
+  $caddyBin = "`"$CaddyExe`" run --config `"$CaddyConfigPath`" --adapter caddyfile"
 
-Ensure-Service -Name $AppServiceName `
-  -DisplayName "BotFather App" `
-  -Description "Telegram tire fitting mini app backend" `
-  -BinaryPath $appBin
+  Ensure-Service -Name $AppServiceName `
+    -DisplayName "BotFather App" `
+    -Description "Telegram tire fitting mini app backend" `
+    -BinaryPath $appBin
 
-Ensure-Service -Name $CaddyServiceName `
-  -DisplayName "BotFather Caddy" `
-  -Description "Caddy reverse proxy for BotFather app/api domains" `
-  -BinaryPath $caddyBin
+  Ensure-Service -Name $CaddyServiceName `
+    -DisplayName "BotFather Caddy" `
+    -Description "Caddy reverse proxy for BotFather app/api domains" `
+    -BinaryPath $caddyBin
 
-Write-Step "Restarting services"
-Restart-ServiceSafe -Name $AppServiceName
-Restart-ServiceSafe -Name $CaddyServiceName
+  Write-Step "Restarting services"
+  Restart-ServiceSafe -Name $AppServiceName
+  Restart-ServiceSafe -Name $CaddyServiceName
+} else {
+  Write-Step "Starting app and caddy in manual mode (no Windows services)"
+
+  Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -eq "node.exe" -and $_.CommandLine -like "*$TargetDir\src\server.js*" } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+
+  Get-CimInstance Win32_Process -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -eq "caddy_windows_amd64.exe" -and $_.CommandLine -like "*$CaddyConfigPath*" } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+
+  Start-Process -FilePath $env:ComSpec -ArgumentList "/c `"$runCmdPath`"" -WindowStyle Hidden
+  Start-Process -FilePath $env:ComSpec -ArgumentList "/c `"$runCaddyCmdPath`"" -WindowStyle Hidden
+}
 
 Write-Step "Checking backend health"
 $healthOk = Wait-ForHealth -Url "http://127.0.0.1:3000/api/health"
@@ -311,3 +337,6 @@ Write-Host "Next steps:" -ForegroundColor Yellow
 Write-Host "1) Put real BOT_TOKEN and ADMIN_IDS into $envPath (if not set yet)."
 Write-Host "2) Verify HTTPS: https://$ApiDomain/api/health"
 Write-Host "3) Set Mini App URL in @BotFather to https://$AppDomain"
+if ($SkipServices) {
+  Write-Host "4) To run again manually: powershell -ExecutionPolicy Bypass -File .\scripts\deploy-windows.ps1 -SkipServices -AppDomain $AppDomain -ApiDomain $ApiDomain"
+}

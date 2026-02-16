@@ -91,6 +91,12 @@ powershell -ExecutionPolicy Bypass -File .\scripts\deploy-windows.ps1 -AppDomain
 powershell -ExecutionPolicy Bypass -File .\scripts\deploy-windows.ps1 -SkipSourceSync -AppDomain app.<ваш_домен> -ApiDomain api.<ваш_домен>
 ```
 
+Если не нужен режим Windows Services (ручной запуск), добавьте флаг:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\deploy-windows.ps1 -SkipServices -AppDomain app.<ваш_домен> -ApiDomain api.<ваш_домен>
+```
+В этом режиме скрипт запускает backend и Caddy как обычные процессы текущего пользователя.
+
 После деплоя обязательно проверьте `.env`:
 - `BOT_TOKEN=<ваш токен>`
 - `ADMIN_IDS=<telegram_user_id,через,запятую>`
