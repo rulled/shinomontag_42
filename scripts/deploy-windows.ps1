@@ -95,18 +95,36 @@ function Ensure-Service {
 
   $existing = Get-Service -Name $Name -ErrorAction SilentlyContinue
   if (-not $existing) {
-    & sc.exe create $Name "binPath= $BinaryPath" "start= auto" "DisplayName= $DisplayName" | Out-Null
+    New-Service -Name $Name -BinaryPathName $BinaryPath -DisplayName $DisplayName -StartupType Automatic | Out-Null
   } else {
-    & sc.exe config $Name "binPath= $BinaryPath" "start= auto" "DisplayName= $DisplayName" | Out-Null
+    $configOut = & sc.exe config $Name "binPath= $BinaryPath" "start= auto" "DisplayName= $DisplayName"
+    if ($LASTEXITCODE -ne 0) {
+      throw "Failed to update service '$Name' via sc.exe config.`n$configOut"
+    }
   }
 
-  & sc.exe description $Name $Description | Out-Null
-  & sc.exe failure $Name "reset= 86400" "actions= restart/5000/restart/5000/restart/5000" | Out-Null
+  $descriptionOut = & sc.exe description $Name $Description
+  if ($LASTEXITCODE -ne 0) {
+    throw "Failed to set description for service '$Name'.`n$descriptionOut"
+  }
+
+  $failureOut = & sc.exe failure $Name "reset= 86400" "actions= restart/5000/restart/5000/restart/5000"
+  if ($LASTEXITCODE -ne 0) {
+    throw "Failed to set recovery policy for service '$Name'.`n$failureOut"
+  }
+
+  $existsNow = Get-Service -Name $Name -ErrorAction SilentlyContinue
+  if (-not $existsNow) {
+    throw "Service '$Name' was not created."
+  }
 }
 
 function Restart-ServiceSafe {
   param([string]$Name)
-  $service = Get-Service -Name $Name -ErrorAction Stop
+  $service = Get-Service -Name $Name -ErrorAction SilentlyContinue
+  if (-not $service) {
+    throw "Service '$Name' not found. Run deploy script in elevated PowerShell (Run as Administrator)."
+  }
   if ($service.Status -eq "Running") {
     Stop-Service -Name $Name -Force -ErrorAction Stop
     Start-Sleep -Seconds 2
